@@ -1,0 +1,180 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── ENUMS ───────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum PaymentStatus {
+  requires_payment_method
+  requires_confirmation
+  requires_action
+  processing
+  requires_capture
+  canceled
+  succeeded
+}
+
+enum OrderStatus {
+  pending
+  confirmed
+  shipped
+  delivered
+  canceled
+}
+
+// ─── AUTH (NextAuth) ──────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  password      String?
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+  role          UserRole  @default(USER)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  accounts Account[]
+  sessions Session[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @id
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Product {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String? @db.Text
+  imageUrl    String? @db.Text
+  price       Float   @db.DoublePrecision
+
+  quantity Int @default(0)
+
+  isArchived Boolean @default(false)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+
+  @@map("products")
+}
+
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        String @id @default(cuid())
+  cartId    String
+  productId String
+  quantity  Int
+  price     Float  @db.DoublePrecision
+
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("cart_items")
+}
+
+model Order {
+  id                    String        @id @default(cuid())
+  userId                String
+  totalPrice            Float         @db.DoublePrecision
+  status                OrderStatus   @default(pending)
+  paymentStatus         PaymentStatus
+  stripePaymentIntentId String?
+  items                 OrderItem[]
+  payment               Payment?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Int
+  price     Float  @db.DoublePrecision
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+model Payment {
+  id                    String        @id @default(cuid())
+  orderId               String        @unique
+  stripePaymentIntentId String
+  amount                Float         @db.DoublePrecision
+  status                PaymentStatus
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@map("payments")
+}

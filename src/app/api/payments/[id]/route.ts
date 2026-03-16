@@ -1,0 +1,29 @@
+import { NextRequest } from 'next/server'
+import { z } from 'zod'
+
+import { paymentService } from '@/services/payment.service'
+import { orderService } from '@/services/order.service'
+import { ApiResponse } from '@/utils/apiResponse'
+import { withErrorHandler } from '@/middlewares/withErrorHandler'
+import { requireUser } from '@/lib/auth/requireAdmin'
+import { ForbiddenError } from '@/utils/errors'
+
+const paramsSchema = z.object({ id: z.string().min(1) })
+
+export const GET = withErrorHandler(async (_req: NextRequest, context) => {
+    const session = await requireUser()
+    if (!session) throw new ForbiddenError()
+
+    const { id } = paramsSchema.parse(await context.params)
+    const payment = await paymentService.getById(id)
+
+    // Ensure the user owns the related order
+    if (session.user.role !== 'ADMIN') {
+        const order = await orderService.getById(payment.orderId)
+        if (order.userId !== session.user.id) {
+            throw new ForbiddenError()
+        }
+    }
+
+    return ApiResponse.success(payment)
+})
