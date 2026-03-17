@@ -129,7 +129,7 @@ export function ProductFormDialog({ open, onOpenChange, product }: Props) {
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>{isEdit ? "Modifier le produit" : "Nouveau produit"}</DialogTitle>
+                    <DialogTitle>{isEdit ? "Modify the product" : "New product"}</DialogTitle>
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit}>
@@ -140,11 +140,11 @@ export function ProductFormDialog({ open, onOpenChange, product }: Props) {
                         className="flex flex-col gap-4"
                     >
                         <FormField label="Nom" id="name" error={errors.name} required>
-                            <TextInput id="name" type="text" value={form.name} onChange={setField("name")} placeholder="Nom du produit" invalid={!!errors.name} />
+                            <TextInput id="name" type="text" value={form.name} onChange={setField("name")} placeholder="Name of the product" invalid={!!errors.name} />
                         </FormField>
 
                         <FormField label="Description" id="description" error={errors.description}>
-                            <TextAreaInput id="description" value={form.description} onChange={setField("description")} placeholder="Description (optionnel)" invalid={!!errors.description} rows={3} />
+                            <TextAreaInput id="description" value={form.description} onChange={setField("description")} placeholder="Description (optionnal)" invalid={!!errors.description} rows={3} />
                         </FormField>
 
                         <FormField label="Image URL" id="imageUrl" error={errors.imageUrl}>
@@ -162,7 +162,7 @@ export function ProductFormDialog({ open, onOpenChange, product }: Props) {
                                 />
                             </FormField>
 
-                            <FormField label="Quantité" id="quantity" error={errors.quantity} required>
+                            <FormField label="Quantity" id="quantity" error={errors.quantity} required>
                                 <NumberInput
                                     id="quantity"
                                     value={form.quantity}
@@ -180,8 +180,8 @@ export function ProductFormDialog({ open, onOpenChange, product }: Props) {
                                     value={form.isArchived}
                                     onChange={setField("isArchived")}
                                     options={[
-                                        { value: "false", label: "Actif" },
-                                        { value: "true", label: "Archivé" },
+                                        { value: "false", label: "Active" },
+                                        { value: "true", label: "Archived" },
                                     ]}
                                     invalid={!!errors.isArchived}
                                 />
@@ -197,10 +197,10 @@ export function ProductFormDialog({ open, onOpenChange, product }: Props) {
 
                     <DialogFooter className="mt-4">
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                            Annuler
+                            Cancel
                         </Button>
                         <Button type="submit" disabled={submitting}>
-                            {submitting ? "En cours..." : isEdit ? "Modifier" : "Créer"}
+                            {submitting ? "In progress..." : isEdit ? "Modify" : "Create"}
                         </Button>
                     </DialogFooter>
                 </form>

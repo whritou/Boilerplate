@@ -14,8 +14,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Plus, Pencil, Trash2 } from "lucide-react"
 
-import { ProductFormDialog } from "./_components/ProductFormDialog"
-import { DeleteProductDialog } from "./_components/DeleteProductDialog"
+import { ProductFormDialog } from "@/components/products/ProductFormDialog"
+import { DeleteProductDialog } from "@/components/products/DeleteProductDialog"
 
 const archivedOptions = [
     { value: "false", label: "Actifs" },
@@ -24,7 +24,7 @@ const archivedOptions = [
 
 export default function AdminProductsPage() {
     const [page, setPage] = useState(1)
-    const [perPage, setPerPage] = useState(20)
+    const [perPage, setPerPage] = useState(10)
     const [search, setSearch] = useState("")
     const [archivedFilter, setArchivedFilter] = useState("all")
 
@@ -36,7 +36,6 @@ export default function AdminProductsPage() {
     const storeError = useProductStore((s) => s.error)
     const clearError = useProductStore((s) => s.clearError)
 
-    // Dialog state
     const [formOpen, setFormOpen] = useState(false)
     const [editProduct, setEditProduct] = useState<ProductEntity | null>(null)
     const [deleteProduct, setDeleteProduct] = useState<ProductEntity | null>(null)
@@ -56,7 +55,7 @@ export default function AdminProductsPage() {
     const columns: Column<ProductEntity>[] = [
         {
             key: "name",
-            header: "Produit",
+            header: "Product",
             render: (row) => (
                 <CellStack
                     primary={row.name}
@@ -66,7 +65,7 @@ export default function AdminProductsPage() {
         },
         {
             key: "price",
-            header: "Prix",
+            header: "Price",
             className: "w-[100px]",
             render: (row) => <CellAmount value={`${row.price.toFixed(2)} €`} />,
         },
@@ -103,14 +102,18 @@ export default function AdminProductsPage() {
         },
     ]
 
-    const state = <DataState loading={loading} error={error || storeError} data={products} loadingMessage="Chargement des produits..." errorMessage={error || storeError || "Erreur de chargement"} emptyMessage="Aucun produit trouvé" />
+    const state = <DataState loading={loading}
+                             error={error || storeError} data={products}
+                             loadingMessage="Loading products..."
+                             errorMessage={error || storeError || "An error occured"}
+                             emptyMessage="No product found" />
 
     if (loading || (error && products.length === 0) || (!loading && products.length === 0)) {
         return (
             <div>
                 <div className="mb-6 flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">Produits</h1>
-                    <Button onClick={handleCreate}><Plus className="mr-2 h-4 w-4" /> Ajouter</Button>
+                    <h1 className="text-2xl font-bold">Products</h1>
+                    <Button onClick={handleCreate}><Plus className="mr-2 h-4 w-4" /> Add</Button>
                 </div>
                 {state}
                 <ProductFormDialog open={formOpen} onOpenChange={setFormOpen} product={editProduct} />
@@ -121,9 +124,9 @@ export default function AdminProductsPage() {
     return (
         <div>
             <div className="mb-6 flex items-center justify-between">
-                <h1 className="text-2xl font-bold">Produits</h1>
+                <h1 className="text-2xl font-bold">Products List</h1>
                 <Button onClick={handleCreate}>
-                    <Plus className="mr-2 h-4 w-4" /> Ajouter
+                    <Plus className="mr-2 h-4 w-4" /> Add
                 </Button>
             </div>
 

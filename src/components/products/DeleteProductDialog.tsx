@@ -42,9 +42,9 @@ export function DeleteProductDialog({ product, onClose }: Props) {
         <AlertDialog open={!!product} onOpenChange={(open) => { if (!open) onClose() }}>
             <AlertDialogContent>
                 <AlertDialogHeader>
-                    <AlertDialogTitle>Supprimer le produit</AlertDialogTitle>
+                    <AlertDialogTitle>Delete the product</AlertDialogTitle>
                     <AlertDialogDescription>
-                        Voulez-vous vraiment supprimer <strong>{product?.name}</strong> ? Cette action est irréversible.
+                        Do you really want to delete <strong>{product?.name}</strong> ? This action is irreversible.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
 
@@ -53,9 +53,9 @@ export function DeleteProductDialog({ product, onClose }: Props) {
                 )}
 
                 <AlertDialogFooter>
-                    <AlertDialogCancel disabled={deleting}>Annuler</AlertDialogCancel>
+                    <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
                     <AlertDialogAction variant="destructive" onClick={handleDelete} disabled={deleting}>
-                        {deleting ? "Suppression..." : "Supprimer"}
+                        {deleting ? "Deleting..." : "Delete"}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>

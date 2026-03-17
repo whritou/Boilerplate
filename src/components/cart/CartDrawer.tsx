@@ -77,12 +77,12 @@ export function CartDrawer() {
 
             <SheetContent className="flex flex-col">
                 <SheetHeader>
-                    <SheetTitle>Panier ({itemCount})</SheetTitle>
+                    <SheetTitle>Cart ({itemCount})</SheetTitle>
                 </SheetHeader>
 
                 {loading && (
                     <div className="flex-1 flex items-center justify-center">
-                        <p className="text-sm text-muted-foreground">Chargement...</p>
+                        <p className="text-sm text-muted-foreground">Loading...</p>
                     </div>
                 )}
 
@@ -94,7 +94,7 @@ export function CartDrawer() {
 
                 {!loading && (!cart || cart.items.length === 0) && (
                     <div className="flex-1 flex items-center justify-center">
-                        <p className="text-sm text-muted-foreground">Votre panier est vide</p>
+                        <p className="text-sm text-muted-foreground">Your cart is empty</p>
                     </div>
                 )}
 
@@ -154,7 +154,7 @@ export function CartDrawer() {
                                 <span className="text-lg font-bold">{total.toFixed(2)} €</span>
                             </div>
                             <Button className="w-full" size="lg" onClick={handleOrder} disabled={ordering}>
-                                {ordering ? "Création de la commande..." : "Commander"}
+                                {ordering ? "Creation of your order..." : "Order"}
                             </Button>
                         </SheetFooter>
                     </>

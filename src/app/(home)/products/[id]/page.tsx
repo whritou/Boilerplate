@@ -16,10 +16,20 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     const [adding, setAdding] = useState(false)
     const [addError, setAddError] = useState<string | null>(null)
     const [added, setAdded] = useState(false)
+    const [quantity, setQuantity] = useState(1)
 
     const addItem = useCartStore((s) => s.addItem)
     const storeError = useCartStore((s) => s.error)
     const clearError = useCartStore((s) => s.clearError)
+
+    const increase = () => {
+        if (!product) return
+        setQuantity((q) => Math.min(q + 1, product.quantity))
+    }
+
+    const decrease = () => {
+        setQuantity((q) => Math.max(1, q - 1))
+    }
 
     const handleAddToCart = async () => {
         if (!product) return
@@ -28,12 +38,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         setAddError(null)
         clearError()
 
-        const result = await addItem(product.id, 1)
+        const result = await addItem(product.id, quantity)
 
         setAdding(false)
 
         if (!result) {
-            setAddError(storeError || "Erreur lors de l'ajout au panier.")
+            setAddError(storeError || "Cannot add to cart, please trt again.")
             return
         }
 
@@ -47,15 +57,15 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         return (
             <div className="container mx-auto px-4 py-8">
                 <Link href="/products" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6">
-                    <ArrowLeft className="w-4 h-4" /> Retour aux produits
+                    <ArrowLeft className="w-4 h-4" /> Go back to products page
                 </Link>
                 <DataState
                     loading={loading}
                     error={error}
                     data={items}
-                    loadingMessage="Chargement du produit..."
-                    errorMessage="Impossible de charger ce produit."
-                    emptyMessage="Produit introuvable."
+                    loadingMessage="Loading the product..."
+                    errorMessage="Impossible to load product."
+                    emptyMessage="Product not found."
                 />
             </div>
         )
@@ -64,7 +74,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     return (
         <div className="container mx-auto px-4 py-8">
             <Link href="/products" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6">
-                <ArrowLeft className="w-4 h-4" /> Retour aux produits
+                <ArrowLeft className="w-4 h-4" /> Go back to products page
             </Link>
 
             <div className="grid md:grid-cols-2 gap-8 mt-4">
@@ -80,7 +90,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                         />
                     ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                            <span className="text-muted-foreground">Pas d'image</span>
+                            <span className="text-muted-foreground">No image available for this product</span>
                         </div>
                     )}
                 </div>
@@ -96,7 +106,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                                 {product.quantity > 10 ? "En stock" : `Plus que ${product.quantity} en stock`}
                             </Badge>
                         ) : (
-                            <Badge variant="destructive">Rupture de stock</Badge>
+                            <Badge variant="destructive">Out of stock</Badge>
                         )}
                     </div>
 
@@ -104,19 +114,43 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                         <p className="text-muted-foreground leading-relaxed">{product.description}</p>
                     )}
 
-                    <div className="mt-4">
+                    <div className="mt-4 flex flex-col gap-4">
+                        {/* Quantity selector */}
+                        <div className="flex items-center gap-3">
+                            <Button variant="outline" onClick={decrease} disabled={quantity <= 1}>
+                                -
+                            </Button>
+
+                            <span className="text-lg font-semibold w-10 text-center">
+            {quantity}
+        </span>
+
+                            <Button
+                                variant="outline"
+                                onClick={increase}
+                                disabled={!product || quantity >= product.quantity}
+                            >
+                                +
+                            </Button>
+                        </div>
+
+                        {/* Add to cart */}
                         <Button
                             size="lg"
                             onClick={handleAddToCart}
                             disabled={adding || product.quantity <= 0}
-                            className="w-full sm:w-auto"
+                            className="sm:w-1/2"
                         >
                             <ShoppingCart className="w-4 h-4 mr-2" />
-                            {adding ? "Ajout..." : added ? "Ajouté !" : "Ajouter au panier"}
+                            {adding
+                                ? "Adding to cart..."
+                                : added
+                                    ? "Added !"
+                                    : `Add ${quantity} to cart`}
                         </Button>
 
                         {addError && (
-                            <p className="text-sm text-destructive mt-2">{addError}</p>
+                            <p className="text-sm text-destructive">{addError}</p>
                         )}
                     </div>
                 </div>

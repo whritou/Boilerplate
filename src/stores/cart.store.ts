@@ -16,12 +16,12 @@ interface CartState {
 }
 
 const HTTP_ERROR_MESSAGES: Record<number, string> = {
-    400: 'Requête invalide',
-    401: 'Vous devez être connecté',
-    403: 'Vous devez être connecté pour accéder au panier',
-    404: 'Ressource introuvable',
-    422: 'Données invalides',
-    500: 'Erreur serveur, veuillez réessayer',
+    400: 'Invalid request',
+    401: 'You must be logged in',
+    403: 'You must be logged in to access cart',
+    404: 'Ressource not found',
+    422: 'Invalid data',
+    500: 'Server error, try again',
 }
 
 const GENERIC_ERROR_NAMES = new Set([
@@ -63,7 +63,7 @@ export const useCartStore = create<CartState>((set, get) => ({
             const json = await res.json()
             set({ cart: mapCart(json.data), loading: false })
         } catch {
-            set({ loading: false, error: 'Erreur réseau' })
+            set({ loading: false, error: 'Network error' })
         }
     },
 
@@ -90,7 +90,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 
             return cart
         } catch {
-            set({ error: 'Erreur réseau' })
+            set({ error: 'Network error' })
             return null
         }
     },
@@ -118,7 +118,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 
             return cart
         } catch {
-            set({ error: 'Erreur réseau' })
+            set({ error: 'Network error' })
             return null
         }
     },
@@ -142,7 +142,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 
             return cart
         } catch {
-            set({ error: 'Erreur réseau' })
+            set({ error: 'Network error' })
             return null
         }
     },
@@ -166,7 +166,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 
             return cart
         } catch {
-            set({ error: 'Erreur réseau' })
+            set({ error: 'Network error' })
             return null
         }
     }

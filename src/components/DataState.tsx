@@ -26,7 +26,7 @@ const DataState = <T,>({
     const displayError = errorMessage
         || (typeof error === 'string' ? error : null)
         || (error && typeof error === 'object' && 'message' in error ? String((error as { message: string }).message) : null)
-        || 'Une erreur est survenue'
+        || 'An error occured'
 
     if (loading) {
         return (

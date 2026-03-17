@@ -13,11 +13,11 @@ import DataState from "@/components/DataState"
 import { Badge } from "@/components/ui/badge"
 
 const statusOptions = [
-    { value: "pending", label: "En attente" },
-    { value: "confirmed", label: "Confirmée" },
-    { value: "shipped", label: "Expédiée" },
-    { value: "delivered", label: "Livrée" },
-    { value: "canceled", label: "Annulée" },
+    { value: "pending", label: "Pending" },
+    { value: "confirmed", label: "Confirmed" },
+    { value: "shipped", label: "Shipped" },
+    { value: "delivered", label: "Delivered" },
+    { value: "canceled", label: "Canceled" },
 ]
 
 const statusVariant = (status: string) => {
@@ -63,7 +63,7 @@ export default function AdminOrdersPage() {
         },
         {
             key: "user",
-            header: "Utilisateur",
+            header: "User",
             render: (row) => <CellMuted>{row.userId.slice(0, 8)}...</CellMuted>,
         },
         {
@@ -93,7 +93,7 @@ export default function AdminOrdersPage() {
         },
         {
             key: "payment",
-            header: "Paiement",
+            header: "Payment",
             className: "w-[120px]",
             render: (row) => (
                 <Badge variant={paymentVariant(row.paymentStatus)}>{row.paymentStatus}</Badge>
@@ -106,16 +106,16 @@ export default function AdminOrdersPage() {
             loading={loading}
             error={error || storeError}
             data={orders}
-            loadingMessage="Chargement des commandes..."
+            loadingMessage="Loading orders..."
             errorMessage={error || storeError || undefined}
-            emptyMessage="Aucune commande trouvée"
+            emptyMessage="No order found"
         />
     )
 
     if (loading || (error && orders.length === 0) || (!loading && orders.length === 0)) {
         return (
             <div>
-                <h1 className="text-2xl font-bold mb-6">Commandes</h1>
+                <h1 className="text-2xl font-bold mb-6">Orders</h1>
                 {state}
             </div>
         )
@@ -123,7 +123,7 @@ export default function AdminOrdersPage() {
 
     return (
         <div>
-            <h1 className="text-2xl font-bold mb-6">Commandes</h1>
+            <h1 className="text-2xl font-bold mb-6">Orders List</h1>
 
             {storeError && (
                 <div className="mb-4 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">

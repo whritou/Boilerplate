@@ -42,7 +42,7 @@ export default function UserOrdersPage() {
     const columns: Column<OrderEntity>[] = [
         {
             key: "id",
-            header: "Commande",
+            header: "order",
             render: (row) => <CellMuted>{row.id.slice(0, 8)}...</CellMuted>,
         },
         {
@@ -69,7 +69,7 @@ export default function UserOrdersPage() {
         },
         {
             key: "payment",
-            header: "Paiement",
+            header: "Payment",
             render: (row) => (
                 <Badge variant={paymentVariant(row.paymentStatus)}>{row.paymentStatus}</Badge>
             ),
@@ -93,16 +93,16 @@ export default function UserOrdersPage() {
             loading={loading}
             error={error}
             data={orders}
-            loadingMessage="Chargement des commandes..."
+            loadingMessage="Loading the orders..."
             errorMessage={error || undefined}
-            emptyMessage="Aucune commande pour le moment."
+            emptyMessage="No order yet"
         />
     )
 
     if (loading || error || orders.length === 0) {
         return (
             <div className="container mx-auto px-4 py-8">
-                <h1 className="text-2xl font-bold mb-6">Mes commandes</h1>
+                <h1 className="text-2xl font-bold mb-6">My orders</h1>
                 {state}
             </div>
         )
@@ -110,7 +110,7 @@ export default function UserOrdersPage() {
 
     return (
         <div className="container mx-auto px-4 py-8">
-            <h1 className="text-2xl font-bold mb-6">Mes commandes</h1>
+            <h1 className="text-2xl font-bold mb-6">My orders</h1>
             <DataTable
                 columns={columns}
                 data={orders}

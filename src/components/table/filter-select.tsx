@@ -26,7 +26,7 @@ export function FilterSelect({
   onChange,
   options,
   placeholder,
-  allLabel = "Tous",
+  allLabel = "All",
   className,
 }: FilterSelectProps) {
   return (

@@ -120,8 +120,8 @@ export function DataTable<T>({
 }
 
 export function TableEmpty({
-  icon = "📋",
-  title = "Aucun résultat",
+  icon = "",
+  title = "Table Empty",
   description,
 }: {
   icon?: string
@@ -151,7 +151,7 @@ export function TableToolbar({
       {children}
       {count !== undefined && (
         <span className="ml-auto text-[11px] text-stone-400">
-          {count} résultat{count !== 1 ? "s" : ""}
+          {count} result{count !== 1 ? "s" : ""}
         </span>
       )}
     </div>
@@ -185,7 +185,7 @@ export function TablePagination({
             {/* LEFT — per page */}
             <div className="flex items-center justify-center md:justify-start gap-2">
                 <span className="text-xs text-muted-foreground">
-                  Afficher
+                  Show
                 </span>
 
                 <Select
@@ -205,13 +205,13 @@ export function TablePagination({
                 </Select>
 
                 <span className="text-xs text-muted-foreground">
-                  par page
+                  per page
                 </span>
             </div>
 
             {/* CENTER — results info */}
             <span className="text-xs text-muted-foreground text-center md:text-left">
-                {from}-{to} sur {total}
+                {from}-{to} on {total}
             </span>
 
             {/* RIGHT — navigation */}

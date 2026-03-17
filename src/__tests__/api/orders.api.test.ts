@@ -28,20 +28,27 @@ beforeEach(() => {
 describe('GET /api/orders', () => {
     it('returns 403 when not authenticated', async () => {
         mockAuth.mockResolvedValue(null)
+
         const req = new NextRequest(new URL('http://localhost:3000/api/orders'))
         const res = await GET(req, { params: Promise.resolve({}) })
+
         expect(res.status).toBe(403)
     })
 
     it('returns user orders for regular user', async () => {
         mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } })
-        mockService.getByUserId.mockResolvedValue([{ id: 'ord-1' }])
+
+        mockService.getAll.mockResolvedValue({
+            data: [{ id: 'ord-1' }],
+            meta: { total: 1 }
+        })
 
         const req = new NextRequest(new URL('http://localhost:3000/api/orders'))
         const res = await GET(req, { params: Promise.resolve({}) })
         const json = await res.json()
 
         expect(res.status).toBe(200)
+        expect(json.success).toBe(true)
         expect(json.data).toHaveLength(1)
     })
 })

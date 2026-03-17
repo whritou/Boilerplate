@@ -28,11 +28,18 @@ export default function AppBar() {
                 BoilerPlate
             </Link>
 
-            <NavigationMenu>
+            <NavigationMenu className={"flex space-x-8"}>
                 <NavigationMenuList className="space-x-4 hidden md:flex">
                     <NavigationMenuItem>
-                        <Link href="/admin" className="text-sm hover:underline">
+                        <Link href="/admin/products" className="text-sm hover:underline">
                             Admin
+                        </Link>
+                    </NavigationMenuItem>
+                </NavigationMenuList>
+                <NavigationMenuList className="space-x-4 hidden md:flex">
+                    <NavigationMenuItem>
+                        <Link href="/products" className="text-sm hover:underline">
+                            Products
                         </Link>
                     </NavigationMenuItem>
                 </NavigationMenuList>
@@ -49,10 +56,7 @@ export default function AppBar() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                         <DropdownMenuItem asChild>
-                            <Link href="/orders">Mes commandes</Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                            <Link href="/profile">Profile</Link>
+                            <Link href="/orders">My orders</Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/" })}>
                             Logout

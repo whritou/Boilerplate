@@ -16,8 +16,6 @@ import { mapOrder } from "@/lib/mappers/order.mapper"
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
-// ── Payment Form (inside Elements provider) ─────────────────────────────────
-
 function PaymentForm({ orderId, totalPrice }: { orderId: string; totalPrice: string }) {
     const stripe = useStripe()
     const elements = useElements()
@@ -38,7 +36,6 @@ function PaymentForm({ orderId, totalPrice }: { orderId: string; totalPrice: str
             },
         })
 
-        // If we reach here, there was an error (otherwise redirect happened)
         if (error) {
             setPayError(error.message ?? "Erreur lors du paiement.")
         }
@@ -63,16 +60,15 @@ function PaymentForm({ orderId, totalPrice }: { orderId: string; totalPrice: str
                 disabled={!stripe || !elements || paying}
             >
                 {paying ? (
-                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Paiement en cours...</>
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Payment in progress...</>
                 ) : (
-                    <><CreditCard className="w-4 h-4 mr-2" /> Payer {parseFloat(totalPrice).toFixed(2)} €</>
+                    <><CreditCard className="w-4 h-4 mr-2" /> Pay {parseFloat(totalPrice).toFixed(2)} €</>
                 )}
             </Button>
         </form>
     )
 }
 
-// ── Checkout Page ────────────────────────────────────────────────────────────
 
 export default function CheckoutPage({ params }: { params: Promise<{ orderId: string }> }) {
     const { orderId } = use(params)
@@ -83,7 +79,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
     const [syncing, setSyncing] = useState(false)
     const invalidate = useOrderStore((s) => s.invalidate)
 
-    // Sync payment status when returning from Stripe redirect
     const syncPayment = useCallback(async () => {
         setSyncing(true)
         try {
@@ -110,7 +105,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
         const url = new URL(window.location.href)
         if (url.searchParams.has("payment") || url.searchParams.has("payment_intent")) {
             syncPayment()
-            // Clean up URL params
             url.searchParams.delete("payment")
             url.searchParams.delete("payment_intent")
             url.searchParams.delete("payment_intent_client_secret")
@@ -119,7 +113,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
         }
     }, [syncPayment])
 
-    // Create payment intent when order loads (and not already paid)
     useEffect(() => {
         if (!order || order.paymentStatus === "succeeded" || syncing) return
 
@@ -134,12 +127,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
             .then(async (res) => {
                 const json = await res.json()
                 if (!res.ok) {
-                    setIntentError(json?.error?.message || "Impossible d'initialiser le paiement.")
+                    setIntentError(json?.error?.message || "Impossible to initialize the payment.")
                     return
                 }
                 setClientSecret(json.data.clientSecret)
             })
-            .catch(() => setIntentError("Erreur réseau."))
+            .catch(() => setIntentError("Network error."))
             .finally(() => setIntentLoading(false))
     }, [order, syncing])
 
@@ -149,15 +142,15 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
         return (
             <div className="container mx-auto px-4 py-8 max-w-2xl">
                 <Link href="/orders" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6">
-                    <ArrowLeft className="w-4 h-4" /> Mes commandes
+                    <ArrowLeft className="w-4 h-4" /> My orders
                 </Link>
                 <DataState
                     loading={loading || syncing}
                     error={error}
                     data={items}
-                    loadingMessage="Chargement de la commande..."
+                    loadingMessage="Loading order..."
                     errorMessage={error || undefined}
-                    emptyMessage="Commande introuvable."
+                    emptyMessage="Order not found."
                 />
             </div>
         )
@@ -168,16 +161,16 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
     return (
         <div className="container mx-auto px-4 py-8 max-w-2xl">
             <Link href="/orders" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6">
-                <ArrowLeft className="w-4 h-4" /> Mes commandes
+                <ArrowLeft className="w-4 h-4" /> My orders
             </Link>
 
-            <h1 className="text-2xl font-bold mb-6">Finaliser la commande</h1>
+            <h1 className="text-2xl font-bold mb-6">Place Order</h1>
 
             {/* Order Recap */}
             <Card className="mb-6">
                 <CardHeader>
                     <CardTitle className="flex items-center justify-between">
-                        <span>Récapitulatif</span>
+                        <span>Recap</span>
                         <Badge variant={order.status === "pending" ? "outline" : "secondary"}>
                             {order.status}
                         </Badge>
@@ -211,23 +204,23 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
                 <Card>
                     <CardContent className="flex flex-col items-center gap-3 py-8">
                         <CheckCircle2 className="w-12 h-12 text-green-500" />
-                        <p className="text-lg font-semibold">Commande payée</p>
-                        <p className="text-sm text-muted-foreground">Votre paiement a été confirmé.</p>
+                        <p className="text-lg font-semibold">Order paid</p>
+                        <p className="text-sm text-muted-foreground">Your order has been confirmed.</p>
                         <Link href="/orders">
-                            <Button variant="outline">Voir mes commandes</Button>
+                            <Button variant="outline">See my orders</Button>
                         </Link>
                     </CardContent>
                 </Card>
             ) : (
                 <Card>
                     <CardHeader>
-                        <CardTitle>Paiement</CardTitle>
+                        <CardTitle>Payment</CardTitle>
                     </CardHeader>
                     <CardContent>
                         {intentLoading && (
                             <div className="flex items-center justify-center py-8">
                                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                                <span className="ml-2 text-sm text-muted-foreground">Initialisation du paiement...</span>
+                                <span className="ml-2 text-sm text-muted-foreground">Initialization of the payment...</span>
                             </div>
                         )}
 

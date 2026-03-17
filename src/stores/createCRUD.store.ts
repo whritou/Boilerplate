@@ -38,14 +38,14 @@ export interface CrudState<T> {
 const STALE_MS = 60_000
 
 const HTTP_ERROR_MESSAGES: Record<number, string> = {
-    400: 'Requête invalide',
-    401: 'Vous devez être connecté',
-    403: 'Vous devez être connecté pour accéder à cette ressource',
-    404: 'Ressource introuvable',
-    409: 'Conflit de données',
-    422: 'Données invalides',
-    429: 'Trop de requêtes, veuillez réessayer',
-    500: 'Erreur serveur, veuillez réessayer',
+    400: 'Invalid request',
+    401: 'You must be logged in',
+    403: 'You must be logged in to access this ressource',
+    404: 'Ressource not found',
+    409: 'Data conflict',
+    422: 'Invalid data',
+    429: 'Too many request, please try again later',
+    500: 'Server error, please try again',
 }
 
 // Raw English error names from AppError that should be replaced with French messages
@@ -136,7 +136,7 @@ export function createCrudStore<T extends Identifiable>(
                     }
                 })
             } catch {
-                set({ loading: false, error: 'Erreur réseau' })
+                set({ loading: false, error: 'Network error' })
             }
         },
 
@@ -164,7 +164,7 @@ export function createCrudStore<T extends Identifiable>(
                     },
                 }))
             } catch {
-                set({ loading: false, error: 'Erreur réseau' })
+                set({ loading: false, error: 'Network error' })
             }
         },
 
@@ -209,7 +209,7 @@ export function createCrudStore<T extends Identifiable>(
                 set((state) => {
                     const entities = { ...state.entities }
                     delete entities[tmpId]
-                    return { entities, error: 'Erreur réseau' }
+                    return { entities, error: 'Network error' }
                 })
                 return null
             }
@@ -252,7 +252,7 @@ export function createCrudStore<T extends Identifiable>(
             } catch {
                 set((state) => ({
                     entities: { ...state.entities, [id]: previous },
-                    error: 'Erreur réseau',
+                    error: 'Network error',
                 }))
                 return null
             }
@@ -290,7 +290,7 @@ export function createCrudStore<T extends Identifiable>(
             } catch {
                 set((state) => ({
                     entities: { ...state.entities, [id]: previous },
-                    error: 'Erreur réseau',
+                    error: 'Network error',
                 }))
                 return false
             }
