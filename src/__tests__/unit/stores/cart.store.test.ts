@@ -52,7 +52,7 @@ describe('useCartStore', () => {
 
         const state = useCartStore.getState()
         expect(state.cart).toBeNull()
-        expect(state.error).toBe('Vous devez être connecté pour accéder au panier')
+        expect(state.error).toBe('You must be logged in to access cart')
         expect(state.loading).toBe(false)
     })
 
@@ -62,7 +62,7 @@ describe('useCartStore', () => {
         await useCartStore.getState().fetchCart()
 
         const state = useCartStore.getState()
-        expect(state.error).toBe('Erreur réseau')
+        expect(state.error).toBe('Network error')
     })
 
     it('fetchCart sets fallback error when API returns no message', async () => {
@@ -75,7 +75,7 @@ describe('useCartStore', () => {
         await useCartStore.getState().fetchCart()
 
         const state = useCartStore.getState()
-        expect(state.error).toBe('Erreur serveur, veuillez réessayer')
+        expect(state.error).toBe('Server error, try again')
     })
 
     it('addItem returns updated cart on success', async () => {

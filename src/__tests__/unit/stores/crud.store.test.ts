@@ -65,7 +65,7 @@ describe('createCrudStore', () => {
         await store.getState().fetchMany({})
 
         const state = store.getState()
-        expect(state.error).toBe('Vous devez être connecté pour accéder à cette ressource')
+        expect(state.error).toBe('You must be logged in to access this ressource')
         expect(state.loading).toBe(false)
     })
 
@@ -78,7 +78,7 @@ describe('createCrudStore', () => {
 
         await store.getState().fetchMany({})
 
-        expect(store.getState().error).toBe('Vous devez être connecté pour accéder à cette ressource')
+        expect(store.getState().error).toBe('You must be logged in to access this ressource')
     })
 
     it('fetchMany keeps custom API error messages', async () => {
@@ -98,7 +98,7 @@ describe('createCrudStore', () => {
 
         await store.getState().fetchMany({})
 
-        expect(store.getState().error).toBe('Erreur réseau')
+        expect(store.getState().error).toBe('Network error')
     })
 
     it('fetchOne stores a single entity', async () => {
@@ -135,7 +135,7 @@ describe('createCrudStore', () => {
         const result = await store.getState().createOne({ name: '' } as any)
 
         expect(result).toBeNull()
-        expect(store.getState().error).toBe('Données invalides')
+        expect(store.getState().error).toBe('Invalid data')
     })
 
     it('deleteOne removes entity and returns true', async () => {
