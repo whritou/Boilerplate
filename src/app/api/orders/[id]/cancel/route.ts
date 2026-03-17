@@ -16,7 +16,6 @@ export const POST = withErrorHandler(async (_req: NextRequest, context) => {
     const { id } = paramsSchema.parse(await context.params)
     const order = await orderService.getById(id)
 
-    // Users can only cancel their own orders
     if (session.user.role !== 'ADMIN' && order.userId !== session.user.id) {
         throw new ForbiddenError()
     }

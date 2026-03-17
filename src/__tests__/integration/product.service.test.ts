@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NotFoundError, ConflictError } from '@/utils/errors'
 
-// Mock the repository
 vi.mock('@/repositories/product.repository', () => ({
     productRepository: {
         findMany: vi.fn(),

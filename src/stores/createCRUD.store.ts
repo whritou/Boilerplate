@@ -48,7 +48,6 @@ const HTTP_ERROR_MESSAGES: Record<number, string> = {
     500: 'Server error, please try again',
 }
 
-// Raw English error names from AppError that should be replaced with French messages
 const GENERIC_ERROR_NAMES = new Set([
     'Forbidden', 'Unauthorized', 'Not Found', 'Bad Request',
     'Conflict', 'Too Many Requests', 'Internal server error',
@@ -60,7 +59,6 @@ async function extractError(res: Response): Promise<string> {
     try {
         const json = await res.json()
         const apiMessage = json?.error?.message
-        // If the API message is a generic HTTP error name, prefer our French translation
         if (!apiMessage || GENERIC_ERROR_NAMES.has(apiMessage)) {
             return fallback
         }

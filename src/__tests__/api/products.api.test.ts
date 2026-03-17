@@ -1,12 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Mock auth
 vi.mock('@/lib/auth/requireAdmin', () => ({
     requireAdmin: vi.fn(),
     requireUser: vi.fn(),
 }))
 
-// Mock services
 vi.mock('@/services/product.service', () => ({
     productService: {
         getAll: vi.fn(),

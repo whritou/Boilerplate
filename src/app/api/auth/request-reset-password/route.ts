@@ -1,4 +1,3 @@
-// src/app/api/auth/request-reset-password/route.ts
 import { NextRequest } from "next/server"
 
 import { userService } from "@/services/user.service"
@@ -18,6 +17,5 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
         await mailService.sendResetPasswordEmail(email, token)
     }
 
-    // Toujours retourner 204 pour ne pas exposer l'existence du compte
     return ApiResponse.noContent()
 })

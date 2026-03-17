@@ -22,7 +22,6 @@ const DataState = <T,>({
                            emptyMessage,
                        }: DataStateProps<T>) => {
 
-    // Derive error message: use explicit errorMessage, or extract string from error object
     const displayError = errorMessage
         || (typeof error === 'string' ? error : null)
         || (error && typeof error === 'object' && 'message' in error ? String((error as { message: string }).message) : null)

@@ -40,8 +40,6 @@ class PaymentService {
         return payment
     }
 
-    // ── Stripe Payment Intent (embedded) ─────────────────────────────────────
-
     /**
      * Creates a Stripe PaymentIntent for embedded payment on the checkout page.
      * Returns the client secret needed by Stripe Elements.
@@ -57,7 +55,12 @@ class PaymentService {
             throw new BadRequestError('Order is already paid')
         }
 
-        // If order already has a payment intent, retrieve it instead of creating a new one
+        if (order.expiresAt && order.expiresAt <= new Date() && order.status === 'pending') {
+            const { orderService } = await import('@/services/order.service')
+            await orderService.cancelExpired(orderId)
+            throw new BadRequestError('Order has expired')
+        }
+
         if (order.stripePaymentIntentId) {
             const existingIntent = await stripe.paymentIntents.retrieve(order.stripePaymentIntentId)
             if (existingIntent.status !== 'canceled' && existingIntent.status !== 'succeeded') {
@@ -65,7 +68,7 @@ class PaymentService {
             }
         }
 
-        const amount = Math.round(order.totalPrice * 100) // cents
+        const amount = Math.round(order.totalPrice * 100)
 
         const paymentIntent = await stripe.paymentIntents.create({
             amount,
@@ -74,15 +77,12 @@ class PaymentService {
             automatic_payment_methods: { enabled: true },
         })
 
-        // Persist the payment intent ID on the order
         await orderRepository.update(order.id, {
             stripePaymentIntentId: paymentIntent.id,
         })
 
         return { clientSecret: paymentIntent.client_secret! }
     }
-
-    // ── Sync Payment Status ─────────────────────────────────────────────────
 
     /**
      * Checks the Stripe PaymentIntent status and syncs it to the order + payment record.
@@ -97,14 +97,13 @@ class PaymentService {
         }
 
         if (!order.stripePaymentIntentId) {
-            return order // No payment intent yet, nothing to sync
+            return order
         }
 
         if (order.paymentStatus === 'succeeded') {
-            return order // Already paid, skip
+            return order
         }
 
-        // Retrieve the current status from Stripe
         const intent = await stripe.paymentIntents.retrieve(order.stripePaymentIntentId)
 
         const statusMapping: Record<string, PaymentStatus> = {
@@ -119,20 +118,18 @@ class PaymentService {
 
         const newStatus = statusMapping[intent.status]
         if (!newStatus || newStatus === order.paymentStatus) {
-            return order // No change
+            return order
         }
 
-        // Update order payment status
         await orderRepository.updatePaymentStatus(orderId, newStatus)
 
-        // Update order status based on payment
         if (newStatus === 'succeeded') {
             await orderRepository.updateStatus(orderId, 'confirmed')
+            await orderRepository.update(orderId, { expiresAt: null })
         } else if (newStatus === 'canceled') {
             await orderRepository.updateStatus(orderId, 'canceled')
         }
 
-        // Create or update payment record
         const existingPayment = await paymentRepository.findByStripePaymentIntentId(order.stripePaymentIntentId)
 
         if (existingPayment) {
@@ -146,11 +143,9 @@ class PaymentService {
             })
         }
 
-        // Return the updated order
         return orderRepository.findWithDetails(orderId)
     }
 
-    // ── Stripe Checkout ──────────────────────────────────────────────────────
 
     /**
      * Creates a Stripe Checkout Session for a given order.
@@ -176,7 +171,7 @@ class PaymentService {
                         name: item.product.name,
                         ...(item.product.imageUrl ? { images: [item.product.imageUrl] } : {}),
                     },
-                    unit_amount: Math.round(item.price * 100), // cents
+                    unit_amount: Math.round(item.price * 100),
                 },
                 quantity: item.quantity,
             })),
@@ -185,7 +180,6 @@ class PaymentService {
             cancel_url: cancelUrl,
         })
 
-        // Persist the Stripe session's payment intent on the order
         if (session.payment_intent) {
             await orderRepository.update(order.id, {
                 stripePaymentIntentId: session.payment_intent as string,
@@ -195,7 +189,6 @@ class PaymentService {
         return { sessionId: session.id, url: session.url }
     }
 
-    // ── Payment record CRUD ──────────────────────────────────────────────────
 
     /**
      * Records a payment for an order.
@@ -224,6 +217,7 @@ class PaymentService {
 
         if (data.status === 'succeeded') {
             await orderRepository.updateStatus(data.orderId, 'confirmed')
+            await orderRepository.update(data.orderId, { expiresAt: null })
         }
 
         return payment
@@ -243,6 +237,7 @@ class PaymentService {
 
         if (status === 'succeeded') {
             await orderRepository.updateStatus(payment.orderId, 'confirmed')
+            await orderRepository.update(payment.orderId, { expiresAt: null })
         } else if (status === 'canceled') {
             await orderRepository.updateStatus(payment.orderId, 'canceled')
         }
@@ -250,7 +245,6 @@ class PaymentService {
         return payment
     }
 
-    // ── Stripe Webhooks ──────────────────────────────────────────────────────
 
     /**
      * Handles a Stripe webhook event for a payment intent.

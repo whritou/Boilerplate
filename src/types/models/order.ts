@@ -13,6 +13,7 @@ export interface OrderEntity {
     status: OrderStatus
     paymentStatus: PaymentStatus
     stripePaymentIntentId?: string
+    expiresAt?: Date
     createdAt: Date
     updatedAt: Date
 }
@@ -25,6 +26,7 @@ export interface OrderDTO {
     status: OrderStatus
     paymentStatus: PaymentStatus
     stripePaymentIntentId?: string | null
+    expiresAt?: string | null
     createdAt: string
     updatedAt: string
 }

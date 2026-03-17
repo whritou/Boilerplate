@@ -1,10 +1,7 @@
-// src/lib/query/types.ts
-// Types partagés pour le système de query (pagination, filtres, tri, search, includes)
-
 export interface PaginationParams {
   page?: number
   limit?: number
-  cursor?: string // Cursor-based pagination alternative
+  cursor?: string
 }
 
 export interface SortParams {
@@ -14,7 +11,7 @@ export interface SortParams {
 
 export interface SearchParams {
   search?: string
-  searchFields?: string[] // Champs où chercher
+  searchFields?: string[]
 }
 
 export interface FilterParams {
@@ -29,7 +26,7 @@ export type FilterValue =
   | { eq?: unknown; neq?: unknown; gt?: unknown; gte?: unknown; lt?: unknown; lte?: unknown; in?: unknown[]; like?: string; between?: [unknown, unknown] }
 
 export interface IncludeParams {
-  include?: string[] // ex: ['author', 'author.profile', 'comments']
+  include?: string[]
 }
 
 export interface QueryParams
@@ -38,7 +35,6 @@ export interface QueryParams
     SearchParams,
     FilterParams,
     IncludeParams {
-  /** Extra Prisma where conditions injected by route handlers (e.g. relation filters) */
   extraWhere?: Record<string, unknown>
 }
 

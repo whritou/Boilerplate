@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Mock Prisma
 vi.mock('@/lib/db/prisma', () => ({
     prisma: {
         product: {

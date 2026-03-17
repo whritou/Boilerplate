@@ -17,7 +17,6 @@ export const GET = withErrorHandler(async (_req: NextRequest, context) => {
     const { id } = paramsSchema.parse(await context.params)
     const payment = await paymentService.getById(id)
 
-    // Ensure the user owns the related order
     if (session.user.role !== 'ADMIN') {
         const order = await orderService.getById(payment.orderId)
         if (order.userId !== session.user.id) {

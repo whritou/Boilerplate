@@ -104,6 +104,7 @@ class OrderRepository extends BaseRepository<
             totalPrice: number
             paymentStatus: PaymentStatus
             stripePaymentIntentId?: string
+            expiresAt?: Date
             items: { productId: string; quantity: number; price: number }[]
         },
     ) {
@@ -113,9 +114,26 @@ class OrderRepository extends BaseRepository<
                 totalPrice: data.totalPrice,
                 paymentStatus: data.paymentStatus,
                 stripePaymentIntentId: data.stripePaymentIntentId,
+                expiresAt: data.expiresAt,
                 items: {
                     create: data.items,
                 },
+            },
+            include: {
+                items: true,
+            },
+        })
+    }
+
+    /**
+     * Find all expired unpaid orders (pending + not succeeded/processing + past expiresAt).
+     */
+    async findExpiredUnpaid() {
+        return prisma.order.findMany({
+            where: {
+                status: 'pending',
+                paymentStatus: { notIn: ['succeeded', 'processing'] },
+                expiresAt: { not: null, lte: new Date() },
             },
             include: {
                 items: true,

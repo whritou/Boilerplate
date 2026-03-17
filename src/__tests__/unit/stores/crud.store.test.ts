@@ -139,7 +139,6 @@ describe('createCrudStore', () => {
     })
 
     it('deleteOne removes entity and returns true', async () => {
-        // First add entity
         store.setState({
             entities: { 'entity-1': mapOne(sampleDTO) },
             pages: { '{}': ['entity-1'] },

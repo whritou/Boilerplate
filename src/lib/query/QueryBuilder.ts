@@ -1,7 +1,3 @@
-// src/lib/query/QueryBuilder.ts
-// QueryBuilder universel : pagination, filtres, tri, search, includes
-// Compatible avec n'importe quel modèle Prisma
-
 import type {
   QueryParams,
   PaginatedResult,
@@ -9,7 +5,6 @@ import type {
 } from './types'
 
 export class QueryBuilder {
-  // ─── PAGINATION ────────────────────────────────────────────────────────────
 
   static getPaginationArgs(params: QueryParams) {
     const page = Math.max(1, Number(params.page) || 1)
@@ -39,8 +34,6 @@ export class QueryBuilder {
     }
   }
 
-  // ─── TRI ───────────────────────────────────────────────────────────────────
-
   static getOrderByArgs(
     params: QueryParams,
     allowedFields: string[],
@@ -53,7 +46,6 @@ export class QueryBuilder {
 
     const sortOrder = params.sortOrder === 'asc' ? 'asc' : 'desc'
 
-    // Support du tri sur champs imbriqués: "author.name" → { author: { name: 'asc' } }
     if (sortBy.includes('.')) {
       return { orderBy: QueryBuilder.buildNestedSort(sortBy, sortOrder) }
     }
@@ -65,8 +57,6 @@ export class QueryBuilder {
     const parts = path.split('.')
     return parts.reduceRight((acc, part) => ({ [part]: acc }), order as unknown as object)
   }
-
-  // ─── FILTRES ───────────────────────────────────────────────────────────────
 
     static buildWhereArgs(
         params: QueryParams,
@@ -87,7 +77,6 @@ export class QueryBuilder {
             }
         }
 
-        // ✓ Only inject deletedAt when the model actually has the column
         if (softDelete === true) {
             where.deletedAt = null
         }
@@ -112,15 +101,11 @@ export class QueryBuilder {
   ): object | null {
     if (value === null) return { [key]: null }
     if (typeof value !== 'object') {
-      // CSV string handling
       if (typeof value === 'string' && value.includes(',')) {
         const values = value.split(',').map(v => v.trim()).filter(Boolean)
-        // For Prisma array fields (e.g. Flavor[], Technique[]) → hasSome
         if (isArrayField) return { [key]: { hasSome: values } }
-        // For scalar/enum fields → in
         return { [key]: { in: values } }
       }
-      // Single value on an array field → hasSome with single element
       if (isArrayField && typeof value === 'string') {
         return { [key]: { hasSome: [value] } }
       }
@@ -155,8 +140,6 @@ export class QueryBuilder {
     return parts.reduceRight((acc, part) => ({ [part]: acc }), condition as object)
   }
 
-  // ─── INCLUDES ──────────────────────────────────────────────────────────────
-
   static buildIncludeArgs(
     params: QueryParams,
     allowedIncludes: string[]
@@ -167,7 +150,7 @@ export class QueryBuilder {
 
     for (const includeStr of params.include) {
       if (!allowedIncludes.some((allowed) => includeStr.startsWith(allowed))) {
-        continue // Sécurité : ignorer les includes non autorisés
+        continue
       }
 
       const parts = includeStr.split('.')
@@ -192,8 +175,6 @@ export class QueryBuilder {
       QueryBuilder.setNestedInclude(nested.include, rest)
     }
   }
-
-  // ─── MÉTHODE PRINCIPALE ────────────────────────────────────────────────────
 
     static build(
         params: QueryParams,

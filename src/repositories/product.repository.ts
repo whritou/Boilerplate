@@ -90,6 +90,17 @@ class ProductRepository extends BaseRepository<
             },
         })
     }
+
+    async incrementStock(id: string, quantity: number) {
+        return prisma.product.update({
+            where: { id },
+            data: {
+                quantity: {
+                    increment: quantity,
+                },
+            },
+        })
+    }
 }
 
 export const productRepository = new ProductRepository()

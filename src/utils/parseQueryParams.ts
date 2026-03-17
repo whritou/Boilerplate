@@ -1,6 +1,5 @@
 import type { QueryParams, FilterValue } from '@/lib/query/types'
 
-// Reserved param keys that are NOT filters
 const RESERVED_KEYS = new Set([
   'page', 'limit', 'cursor',
   'sortBy', 'sortOrder',
@@ -12,19 +11,16 @@ const RESERVED_KEYS = new Set([
 export function parseQueryParams(searchParams: URLSearchParams): QueryParams {
   const params: QueryParams = {}
 
-  // Pagination
   if (searchParams.has('page')) params.page = Number(searchParams.get('page'))
   if (searchParams.has('limit')) params.limit = Number(searchParams.get('limit'))
   if (searchParams.has('cursor')) params.cursor = searchParams.get('cursor') ?? undefined
 
-  // Tri
   if (searchParams.has('sortBy')) params.sortBy = searchParams.get('sortBy') ?? undefined
   if (searchParams.has('sortOrder')) {
     const order = searchParams.get('sortOrder')
     params.sortOrder = order === 'asc' ? 'asc' : 'desc'
   }
 
-  // Search
   if (searchParams.has('search')) params.search = searchParams.get('search') ?? undefined
 
   // Includes: ?include=author&include=comments → ['author', 'comments']
@@ -34,7 +30,6 @@ export function parseQueryParams(searchParams: URLSearchParams): QueryParams {
   // Filtres: ?filter[status]=ACTIVE&filter[role]=ADMIN
   const filters: Record<string, FilterValue> = {}
   for (const [key, value] of searchParams.entries()) {
-    // Explicit filter[key] format
     const match = key.match(/^filter\[(.+)\]$/)
     if (match) {
       const field = match[1]
@@ -49,7 +44,6 @@ export function parseQueryParams(searchParams: URLSearchParams): QueryParams {
       continue
     }
 
-    // Flat params: treat non-reserved params as filters
     if (!RESERVED_KEYS.has(key) && !key.startsWith('filter[')) {
       filters[key] = parseValue(value)
     }

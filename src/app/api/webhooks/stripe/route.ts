@@ -61,7 +61,6 @@ export async function POST(req: NextRequest) {
             }
 
             default:
-                // Unhandled event type — acknowledge it
                 break
         }
     } catch (err) {

@@ -18,7 +18,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
     const { orderId } = bodySchema.parse(await req.json())
 
-    // Ensure the user owns this order
     const order = await orderService.getById(orderId)
     if (session.user.role !== 'ADMIN' && order.userId !== session.user.id) {
         throw new ForbiddenError()

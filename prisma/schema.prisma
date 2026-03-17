@@ -143,6 +143,7 @@ model Order {
   status                OrderStatus   @default(pending)
   paymentStatus         PaymentStatus
   stripePaymentIntentId String?
+  expiresAt             DateTime?
   items                 OrderItem[]
   payment               Payment?
 

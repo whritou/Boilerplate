@@ -15,7 +15,6 @@ export const GET = withErrorHandler(async (_req: NextRequest, context) => {
 
     const { id } = paramsSchema.parse(await context.params)
 
-    // Users can only view their own profile unless admin
     if (session.user.id !== id && session.user.role !== 'ADMIN') {
         throw new ForbiddenError()
     }

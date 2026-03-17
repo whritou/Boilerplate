@@ -24,7 +24,6 @@ const SESSION_MAX_AGE = 60 * 60 * 24 * 30 // 30 jours
 const EMAIL_TOKEN_TTL = 15 * 60 * 1000 // 15 minutes
 
 export class AuthService {
-    // ── Session ──────────────────────────────────────────────────────────────
 
     /**
      * Crée un JWT signé + options cookie — utilisé par toutes les routes
@@ -55,8 +54,6 @@ export class AuthService {
             },
         }
     }
-
-    // ── Tokens email ─────────────────────────────────────────────────────────
 
     /**
      * Génère un token aléatoire, le hache, le persiste en base.
@@ -103,8 +100,6 @@ export class AuthService {
         await prisma.verificationToken.delete({ where: { token: hashedToken } })
     }
 
-    // ── Actions métier ────────────────────────────────────────────────────────
-
     async markEmailVerified(userId: string): Promise<void> {
         await prisma.user.update({
             where: { id: userId },
@@ -125,8 +120,6 @@ export class AuthService {
 
         return user
     }
-
-    // ── Helpers privés ────────────────────────────────────────────────────────
 
     private hashToken(token: string): string {
         return crypto.createHash("sha256").update(token).digest("hex")

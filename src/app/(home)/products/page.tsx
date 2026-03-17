@@ -26,7 +26,6 @@ export default function ProductsPage() {
     const { products, meta, loading, error } = useProducts(params)
 
     useEffect(() => {
-        // Guard: only append when page actually changed and we have new data
         if (!products.length || page === prevPageRef.current) return
         prevPageRef.current = page
 

@@ -16,7 +16,6 @@ export const GET = withErrorHandler(async (_req: NextRequest, context) => {
     const { id } = paramsSchema.parse(await context.params)
     const order = await orderService.getById(id)
 
-    // Users can only view their own orders
     if (session.user.role !== 'ADMIN' && order.userId !== session.user.id) {
         throw new ForbiddenError()
     }

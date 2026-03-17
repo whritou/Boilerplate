@@ -11,10 +11,12 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, CreditCard, Loader2, CheckCircle2 } from "lucide-react"
+import { ArrowLeft, CreditCard, Loader2, CheckCircle2, Clock, XCircle } from "lucide-react"
 import { mapOrder } from "@/lib/mappers/order.mapper"
+import { useCountdown } from "@/hooks/useCountdown"
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+
 
 function PaymentForm({ orderId, totalPrice }: { orderId: string; totalPrice: string }) {
     const stripe = useStripe()
@@ -37,7 +39,7 @@ function PaymentForm({ orderId, totalPrice }: { orderId: string; totalPrice: str
         })
 
         if (error) {
-            setPayError(error.message ?? "Erreur lors du paiement.")
+            setPayError(error.message ?? "Payment error.")
         }
 
         setPaying(false)
@@ -69,7 +71,6 @@ function PaymentForm({ orderId, totalPrice }: { orderId: string; totalPrice: str
     )
 }
 
-
 export default function CheckoutPage({ params }: { params: Promise<{ orderId: string }> }) {
     const { orderId } = use(params)
     const { order, loading, error } = useOrder(orderId)
@@ -79,22 +80,22 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
     const [syncing, setSyncing] = useState(false)
     const invalidate = useOrderStore((s) => s.invalidate)
 
+    const countdown = useCountdown(order?.expiresAt)
+    const isExpired = order?.status === "canceled" || (countdown?.expired ?? false)
+
     const syncPayment = useCallback(async () => {
         setSyncing(true)
         try {
             const res = await fetch(`/api/orders/${orderId}/sync-payment`, { method: "POST" })
             if (res.ok) {
                 const json = await res.json()
-                // Update the order in the store with synced data
                 const synced = mapOrder(json.data)
                 useOrderStore.setState((state) => ({
                     entities: { ...state.entities, [orderId]: synced },
                 }))
-                // Invalidate cache so orders list refreshes
                 invalidate()
             }
         } catch {
-            // Silently fail — the order will just show old status
         } finally {
             setSyncing(false)
         }
@@ -114,7 +115,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
     }, [syncPayment])
 
     useEffect(() => {
-        if (!order || order.paymentStatus === "succeeded" || syncing) return
+        if (!order || order.paymentStatus === "succeeded" || order.status === "canceled" || syncing) return
+        if (countdown?.expired) return
 
         setIntentLoading(true)
         setIntentError(null)
@@ -134,7 +136,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
             })
             .catch(() => setIntentError("Network error."))
             .finally(() => setIntentLoading(false))
-    }, [order, syncing])
+    }, [order, syncing, countdown?.expired])
 
     const items = order ? [order] : []
 
@@ -166,12 +168,22 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
 
             <h1 className="text-2xl font-bold mb-6">Place Order</h1>
 
+            {/* Expiration countdown banner */}
+            {!isPaid && !isExpired && countdown && (
+                <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                    <Clock className="w-4 h-4 shrink-0" />
+                    <span>
+                        Time remaining to pay: <strong>{countdown.minutes}:{String(countdown.seconds).padStart(2, "0")}</strong>
+                    </span>
+                </div>
+            )}
+
             {/* Order Recap */}
             <Card className="mb-6">
                 <CardHeader>
                     <CardTitle className="flex items-center justify-between">
                         <span>Recap</span>
-                        <Badge variant={order.status === "pending" ? "outline" : "secondary"}>
+                        <Badge variant={order.status === "pending" ? "outline" : order.status === "canceled" ? "destructive" : "secondary"}>
                             {order.status}
                         </Badge>
                     </CardTitle>
@@ -200,12 +212,23 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
             </Card>
 
             {/* Payment section */}
-            {isPaid ? (
+            {isExpired ? (
+                <Card>
+                    <CardContent className="flex flex-col items-center gap-3 py-8">
+                        <XCircle className="w-12 h-12 text-destructive" />
+                        <p className="text-lg font-semibold">Order expired</p>
+                        <p className="text-sm text-muted-foreground">This order has expired because it was not paid in time. Stock has been restored.</p>
+                        <Link href="/products">
+                            <Button variant="outline">Back to products</Button>
+                        </Link>
+                    </CardContent>
+                </Card>
+            ) : isPaid ? (
                 <Card>
                     <CardContent className="flex flex-col items-center gap-3 py-8">
                         <CheckCircle2 className="w-12 h-12 text-green-500" />
                         <p className="text-lg font-semibold">Order paid</p>
-                        <p className="text-sm text-muted-foreground">Your order has been confirmed.</p>
+                        <p className="text-sm text-muted-foreground">Your payment has been confirmed.</p>
                         <Link href="/orders">
                             <Button variant="outline">See my orders</Button>
                         </Link>

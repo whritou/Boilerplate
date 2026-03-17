@@ -1,9 +1,12 @@
 import { orderRepository } from '@/repositories/order.repository'
 import { cartRepository } from '@/repositories/cart.repository'
 import { productRepository } from '@/repositories/product.repository'
+import { stripe } from '@/lib/stripe'
 import { NotFoundError, BadRequestError } from '@/utils/errors'
 import type { QueryParams } from '@/lib/query/types'
 import type { OrderStatus, PaymentStatus } from '@prisma/client'
+
+const ORDER_EXPIRATION_MINUTES = 30
 
 class OrderService {
     async getAll(params: QueryParams) {
@@ -15,6 +18,13 @@ class OrderService {
 
         if (!order) {
             throw new NotFoundError('Order not found')
+        }
+
+        if (this.isExpired(order)) {
+            await this.cancelExpired(id)
+            const updated = await orderRepository.findWithDetails(id)
+            if (!updated) throw new NotFoundError('Order not found')
+            return updated
         }
 
         return order
@@ -37,6 +47,8 @@ class OrderService {
     /**
      * Creates an order from the user's cart.
      * Validates stock, computes total, decrements inventory, and clears the cart.
+     * Sets an expiration time — if unpaid after ORDER_EXPIRATION_MINUTES, the order
+     * will be automatically cancelled and stock restored.
      */
     async createFromCart(userId: string, paymentStatus: PaymentStatus = 'requires_payment_method', stripePaymentIntentId?: string) {
         const cart = await cartRepository.findByUserId(userId)
@@ -45,7 +57,6 @@ class OrderService {
             throw new BadRequestError('Cart is empty')
         }
 
-        // Validate stock for all items
         for (const item of cart.items) {
             const product = await productRepository.findById(item.productId)
 
@@ -62,18 +73,19 @@ class OrderService {
             }
         }
 
-        // Compute total price
         const totalPrice = cart.items.reduce(
             (sum: number, item: any) => sum + item.price * item.quantity,
             0,
         )
 
-        // Create order with items
+        const expiresAt = new Date(Date.now() + ORDER_EXPIRATION_MINUTES * 60 * 1000)
+
         const order = await orderRepository.createWithItems({
             userId,
             totalPrice,
             paymentStatus,
             stripePaymentIntentId,
+            expiresAt,
             items: cart.items.map((item: any) => ({
                 productId: item.productId,
                 quantity: item.quantity,
@@ -81,12 +93,10 @@ class OrderService {
             })),
         })
 
-        // Decrement stock
         for (const item of cart.items) {
             await productRepository.decrementStock(item.productId, item.quantity)
         }
 
-        // Clear the cart
         await cartRepository.clearItems(cart.id)
 
         return order
@@ -112,6 +122,9 @@ class OrderService {
         return order
     }
 
+    /**
+     * User-initiated cancellation. Restores stock atomically.
+     */
     async cancel(id: string) {
         const order = await orderRepository.findWithDetails(id)
 
@@ -123,15 +136,69 @@ class OrderService {
             throw new BadRequestError('Cannot cancel a shipped or delivered order')
         }
 
-        // Restore stock
         for (const item of order.items) {
-            await productRepository.updateStock(
-                item.productId,
-                (await productRepository.findById(item.productId))!.quantity + item.quantity,
-            )
+            await productRepository.incrementStock(item.productId, item.quantity)
         }
 
+        if (order.stripePaymentIntentId) {
+            try {
+                await stripe.paymentIntents.cancel(order.stripePaymentIntentId)
+            } catch {
+            }
+        }
+
+        await orderRepository.updatePaymentStatus(id, 'canceled')
         return orderRepository.updateStatus(id, 'canceled')
+    }
+
+    /**
+     * Check if an order is expired (pending + unpaid + past expiresAt).
+     */
+    private isExpired(order: { expiresAt: Date | null; status: string; paymentStatus: string }): boolean {
+        if (!order.expiresAt) return false
+        return (
+            order.status === 'pending' &&
+            order.paymentStatus !== 'succeeded' &&
+            order.paymentStatus !== 'processing' &&
+            order.expiresAt <= new Date()
+        )
+    }
+
+    /**
+     * Cancel an expired order: restore stock, cancel Stripe PaymentIntent, update statuses.
+     */
+    async cancelExpired(id: string) {
+        const order = await orderRepository.findWithDetails(id)
+        if (!order) return
+        if (order.status !== 'pending') return
+        if (order.paymentStatus === 'succeeded' || order.paymentStatus === 'processing') return
+
+        if (order.stripePaymentIntentId) {
+            try {
+                await stripe.paymentIntents.cancel(order.stripePaymentIntentId)
+            } catch {
+            }
+        }
+
+        for (const item of order.items) {
+            await productRepository.incrementStock(item.productId, item.quantity)
+        }
+
+        await orderRepository.updateStatus(id, 'canceled')
+        await orderRepository.updatePaymentStatus(id, 'canceled')
+    }
+
+    /**
+     * Batch cancel all expired unpaid orders. Used by the cleanup cron job.
+     */
+    async cancelAllExpired() {
+        const expiredOrders = await orderRepository.findExpiredUnpaid()
+
+        for (const order of expiredOrders) {
+            await this.cancelExpired(order.id)
+        }
+
+        return expiredOrders.length
     }
 }
 

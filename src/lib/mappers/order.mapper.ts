@@ -14,6 +14,7 @@ export function mapOrder(dto: OrderDTO): OrderEntity {
         status: dto.status,
         paymentStatus: dto.paymentStatus,
         stripePaymentIntentId: dto.stripePaymentIntentId ?? undefined,
+        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : undefined,
         createdAt: new Date(dto.createdAt),
         updatedAt: new Date(dto.updatedAt),
     }

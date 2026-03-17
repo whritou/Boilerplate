@@ -32,7 +32,6 @@ export function parseQueryParams(searchParams: URLSearchParams): QueryParams {
     const include = searchParams.get('include')
     if (include) params.include = include.split(',').map(s => s.trim())
 
-    // Everything else → filters (coerce boolean-like strings for Prisma)
     const filters: Record<string, string | boolean> = {}
     for (const [key, value] of searchParams.entries()) {
         if (!reserved.has(key) && value) {
