@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import { useOrderStore } from "@/stores/order.store"
 import type { OrderEntity } from "@/types/models/order"
 
@@ -27,7 +27,6 @@ export const useOrders = (params: QueryParams = {}) => {
     const meta = useOrderStore((s) => s.meta)
 
     const fetchMany = useOrderStore((s) => s.fetchMany)
-    const loading = useOrderStore((s) => s.loading)
     const error = useOrderStore((s) => s.error)
 
     useEffect(() => {
@@ -43,10 +42,23 @@ export const useOrders = (params: QueryParams = {}) => {
             .filter(Boolean) as OrderEntity[]
     }, [pages, entities, key])
 
+    const currentMeta = meta[key]
+
+    // Keep previous results visible while loading new query
+    const prevOrdersRef = useRef(orders)
+    const prevMetaRef = useRef(currentMeta)
+    if (orders.length > 0 || currentMeta) {
+        prevOrdersRef.current = orders
+        prevMetaRef.current = currentMeta
+    }
+
+    const hasDataForKey = !!pages[key]
+    const isFetching = !hasDataForKey && !error
+
     return {
-        orders,
-        meta: meta[key],
-        loading,
+        orders: orders.length > 0 ? orders : prevOrdersRef.current,
+        meta: currentMeta ?? prevMetaRef.current,
+        loading: isFetching,
         error,
     }
 }

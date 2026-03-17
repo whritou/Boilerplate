@@ -48,6 +48,7 @@ model User {
 
   accounts Account[]
   sessions Session[]
+  orders   Order[]
 
   @@map("users")
 }
@@ -144,8 +145,18 @@ model Order {
   paymentStatus         PaymentStatus
   stripePaymentIntentId String?
   expiresAt             DateTime?
-  items                 OrderItem[]
-  payment               Payment?
+
+  shippingFirstName String? @map("shipping_first_name")
+  shippingLastName  String? @map("shipping_last_name")
+  shippingStreet    String? @map("shipping_street")
+  shippingCity      String? @map("shipping_city")
+  shippingZipCode   String? @map("shipping_zip_code")
+  shippingCountry   String? @map("shipping_country")
+  shippingPhone     String? @map("shipping_phone")
+
+  user    User        @relation(fields: [userId], references: [id])
+  items   OrderItem[]
+  payment Payment?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

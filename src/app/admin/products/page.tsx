@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react"
 import { useProducts } from "@/hooks/useProduct"
+import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import { useProductStore } from "@/stores/product.store"
 import type { ProductEntity } from "@/types/models/product"
 
@@ -16,6 +17,7 @@ import { Plus, Pencil, Trash2 } from "lucide-react"
 
 import { ProductFormDialog } from "@/components/products/ProductFormDialog"
 import { DeleteProductDialog } from "@/components/products/DeleteProductDialog"
+import Image from "next/image";
 
 const archivedOptions = [
     { value: "false", label: "Actifs" },
@@ -26,10 +28,11 @@ export default function AdminProductsPage() {
     const [page, setPage] = useState(1)
     const [perPage, setPerPage] = useState(10)
     const [search, setSearch] = useState("")
+    const debouncedSearch = useDebouncedValue(search, 300)
     const [archivedFilter, setArchivedFilter] = useState("all")
 
     const params: Record<string, string | number> = { page, limit: perPage }
-    if (search) params.search = search
+    if (debouncedSearch) params.search = debouncedSearch
     if (archivedFilter !== "all") params.isArchived = archivedFilter
 
     const { products, meta, loading, error } = useProducts(params)
@@ -64,6 +67,24 @@ export default function AdminProductsPage() {
             ),
         },
         {
+            key: "imageUrl",
+            header: "Image",
+            render: (row) => {
+                const src = row.imageUrl?.trim() || "/placeholder.svg"
+
+                return (
+                    <div className="relative w-[100px] h-[60px]">
+                        <Image
+                            src={src}
+                            alt="product image"
+                            fill
+                            className="object-contain rounded-md"
+                        />
+                    </div>
+                )
+            }
+        },
+        {
             key: "price",
             header: "Price",
             className: "w-[100px]",
@@ -81,7 +102,7 @@ export default function AdminProductsPage() {
             className: "w-[100px]",
             render: (row) => (
                 <Badge variant={row.isArchived ? "secondary" : "default"}>
-                    {row.isArchived ? "Archivé" : "Actif"}
+                    {row.isArchived ? "Archived" : "Available"}
                 </Badge>
             ),
         },
@@ -105,10 +126,11 @@ export default function AdminProductsPage() {
     const state = <DataState loading={loading}
                              error={error || storeError} data={products}
                              loadingMessage="Loading products..."
-                             errorMessage={error || storeError || "An error occured"}
+                             errorMessage={error || storeError || "An error occurred"}
                              emptyMessage="No product found" />
 
-    if (loading || (error && products.length === 0) || (!loading && products.length === 0)) {
+    const isInitialLoad = loading && products.length === 0
+    if (isInitialLoad || (error && products.length === 0) || (!loading && products.length === 0)) {
         return (
             <div>
                 <div className="mb-6 flex items-center justify-between">

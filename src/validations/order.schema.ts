@@ -35,7 +35,18 @@ export const orderParamsSchema = z.object({
     id: z.string().min(1),
 })
 
+export const shippingAddressSchema = z.object({
+    shippingFirstName: z.string().min(1, "First name is required"),
+    shippingLastName: z.string().min(1, "Last name is required"),
+    shippingStreet: z.string().min(1, "Street is required"),
+    shippingCity: z.string().min(1, "City is required"),
+    shippingZipCode: z.string().min(1, "Zip code is required"),
+    shippingCountry: z.string().min(1, "Country is required"),
+    shippingPhone: z.string().optional(),
+})
+
 export type OrderBase = z.infer<typeof orderBaseSchema>
 export type OrderCreate = z.infer<typeof orderCreateSchema>
 export type OrderUpdate = z.infer<typeof orderUpdateSchema>
 export type OrderParams = z.infer<typeof orderParamsSchema>
+export type ShippingAddress = z.infer<typeof shippingAddressSchema>

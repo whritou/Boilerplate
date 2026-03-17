@@ -1,7 +1,5 @@
 import { prisma } from '@/lib/db/prisma'
 import { BaseRepository, RepositoryConfig } from './base.repository'
-import { QueryBuilder } from '@/lib/query/QueryBuilder'
-import type { QueryParams } from '@/lib/query/types'
 import type { Order, Prisma, OrderStatus, PaymentStatus } from '@prisma/client'
 
 class OrderRepository extends BaseRepository<
@@ -17,38 +15,16 @@ class OrderRepository extends BaseRepository<
         return {
             allowedSortFields: ['createdAt', 'updatedAt', 'totalPrice', 'status'],
             allowedFilters:    ['status', 'paymentStatus', 'userId'],
-            allowedIncludes:   ['items', 'items.product', 'payment'],
+            allowedIncludes:   ['items', 'items.product', 'payment', 'user'],
             searchFields:      ['id', 'userId'],
             defaultSortField:  'createdAt',
         }
     }
 
     /**
-     * Override findMany to always include items (with product) and payment.
+     * Fetch a single order with all related data (items + products + payment).
+     * Used by services that always need full order details (cancel, expiration, payment).
      */
-    async findMany(params: QueryParams = {}) {
-        const { skip, take, page, limit, orderBy, where } =
-            QueryBuilder.build(params, this.config)
-
-        const baseWhere = { ...where, ...(params.extraWhere ?? {}) }
-
-        const [data, total] = await Promise.all([
-            prisma.order.findMany({
-                where: baseWhere,
-                orderBy,
-                skip,
-                take,
-                include: {
-                    items: { include: { product: true } },
-                    payment: true,
-                },
-            }),
-            prisma.order.count({ where: baseWhere }),
-        ])
-
-        return QueryBuilder.buildPaginatedResult(data, total, page, limit)
-    }
-
     async findWithDetails(id: string) {
         return prisma.order.findUnique({
             where: { id },
@@ -64,23 +40,17 @@ class OrderRepository extends BaseRepository<
     async findByUserId(userId: string) {
         return prisma.order.findMany({
             where: { userId },
-            include: {
-                items: {
-                    include: { product: true },
-                },
-                payment: true,
-            },
             orderBy: { createdAt: 'desc' },
         })
     }
 
+    /**
+     * Find order by Stripe PaymentIntent ID.
+     * Includes items (needed for amount calculations in payment processing).
+     */
     async findByStripePaymentIntentId(stripePaymentIntentId: string) {
         return prisma.order.findFirst({
             where: { stripePaymentIntentId },
-            include: {
-                items: true,
-                payment: true,
-            },
         })
     }
 

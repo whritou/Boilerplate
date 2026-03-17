@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useOrders } from "@/hooks/useOrder"
+import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import { useOrderStore } from "@/stores/order.store"
 import type { OrderEntity } from "@/types/models/order"
 
@@ -11,6 +12,7 @@ import { SearchInput } from "@/components/table/search-input"
 import { FilterSelect } from "@/components/table/filter-select"
 import DataState from "@/components/DataState"
 import { Badge } from "@/components/ui/badge"
+import { OrderDetailsModal } from "@/components/orders/OrderDetailsModal"
 
 const statusOptions = [
     { value: "pending", label: "Pending" },
@@ -37,18 +39,32 @@ const paymentVariant = (status: string) => {
         case "processing": return "outline"
         case "canceled": return "destructive"
         case "requires_payment_method": return "outline"
+        case "requires_capture": return "outline"
+        case "requires_action": return "outline"
+        case "requires_confirmation": return "outline"
         default: return "outline"
     }
+}
+
+const paymentLabels: Record<string, string> = {
+    succeeded: "Paid",
+    processing: "Processing",
+    canceled: "Canceled",
+    requires_payment_method: "Payment Required",
 }
 
 export default function AdminOrdersPage() {
     const [page, setPage] = useState(1)
     const [perPage, setPerPage] = useState(20)
     const [search, setSearch] = useState("")
+    const debouncedSearch = useDebouncedValue(search, 300)
     const [statusFilter, setStatusFilter] = useState("all")
 
-    const params: Record<string, string | number> = { page, limit: perPage }
-    if (search) params.search = search
+    const [selectedOrder, setSelectedOrder] = useState<OrderEntity | null>(null)
+    const [open, setOpen] = useState(false)
+
+    const params: Record<string, string | number> = { page, limit: perPage, include: 'items,items.product,user' }
+    if (debouncedSearch) params.search = debouncedSearch
     if (statusFilter !== "all") params.status = statusFilter
 
     const { orders, meta, loading, error } = useOrders(params)
@@ -64,7 +80,12 @@ export default function AdminOrdersPage() {
         {
             key: "user",
             header: "User",
-            render: (row) => <CellMuted>{row.userId.slice(0, 8)}...</CellMuted>,
+            render: (row) => (
+                <CellStack
+                    primary={row.user?.name ?? row.userId.slice(0, 8)}
+                    secondary={row.user?.email}
+                />
+            ),
         },
         {
             key: "date",
@@ -74,8 +95,12 @@ export default function AdminOrdersPage() {
         {
             key: "items",
             header: "Articles",
-            className: "w-[80px]",
-            render: (row) => <CellMuted>{row.items.length}</CellMuted>,
+            render: (row) => (
+                <CellStack
+                    primary={`${row.items.length} article${row.items.length !== 1 ? "s" : ""}`}
+                    secondary={row.items.map((i) => i.product?.name ?? i.productId.slice(0, 8)).join(", ")}
+                />
+            ),
         },
         {
             key: "total",
@@ -96,7 +121,9 @@ export default function AdminOrdersPage() {
             header: "Payment",
             className: "w-[120px]",
             render: (row) => (
-                <Badge variant={paymentVariant(row.paymentStatus)}>{row.paymentStatus}</Badge>
+                <Badge variant={paymentVariant(row.paymentStatus)}>
+                    {paymentLabels[row.paymentStatus] || row.paymentStatus}
+                </Badge>
             ),
         },
     ]
@@ -112,7 +139,8 @@ export default function AdminOrdersPage() {
         />
     )
 
-    if (loading || (error && orders.length === 0) || (!loading && orders.length === 0)) {
+    const isInitialLoad = loading && orders.length === 0
+    if (isInitialLoad || (error && orders.length === 0) || (!loading && orders.length === 0)) {
         return (
             <div>
                 <h1 className="text-2xl font-bold mb-6">Orders</h1>
@@ -135,6 +163,10 @@ export default function AdminOrdersPage() {
                 columns={columns}
                 data={orders}
                 rowKey={(row) => row.id}
+                onRowClick={(row) => {
+                    setSelectedOrder(row)
+                    setOpen(true)
+                }}
                 toolbar={
                     <TableToolbar count={meta?.total}>
                         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1) }} className="w-64" />
@@ -158,6 +190,11 @@ export default function AdminOrdersPage() {
                         />
                     )
                 }
+            />
+            <OrderDetailsModal
+                order={selectedOrder}
+                open={open}
+                onOpenChange={setOpen}
             />
         </div>
     )

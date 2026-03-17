@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import { useProductStore } from "@/stores/product.store"
 import type { ProductEntity } from "@/types/models/product"
 
@@ -27,7 +27,6 @@ export const useProducts = (params: QueryParams = {}) => {
     const meta = useProductStore((s) => s.meta)
 
     const fetchMany = useProductStore((s) => s.fetchMany)
-    const loading = useProductStore((s) => s.loading)
     const error = useProductStore((s) => s.error)
 
     useEffect(() => {
@@ -43,10 +42,22 @@ export const useProducts = (params: QueryParams = {}) => {
             .filter(Boolean) as ProductEntity[]
     }, [pages, entities, key])
 
+    const currentMeta = meta[key]
+
+    const prevProductsRef = useRef(products)
+    const prevMetaRef = useRef(currentMeta)
+    if (products.length > 0 || currentMeta) {
+        prevProductsRef.current = products
+        prevMetaRef.current = currentMeta
+    }
+
+    const hasDataForKey = !!pages[key]
+    const isFetching = !hasDataForKey && !error
+
     return {
-        products,
-        meta: meta[key],
-        loading,
+        products: products.length > 0 ? products : prevProductsRef.current,
+        meta: currentMeta ?? prevMetaRef.current,
+        loading: isFetching,
         error,
     }
 }

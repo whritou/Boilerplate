@@ -5,7 +5,7 @@ import Link from "next/link"
 import type { OrderEntity } from "@/types/models/order"
 import DataState from "@/components/DataState"
 import { DataTable, Column, TablePagination } from "@/components/table/data-table"
-import { CellAmount, CellMuted } from "@/components/table/table-cells"
+import { CellAmount, CellMuted, CellStack } from "@/components/table/table-cells"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Eye } from "lucide-react"
@@ -28,15 +28,25 @@ const paymentVariant = (status: string) => {
         case "processing": return "outline"
         case "canceled": return "destructive"
         case "requires_payment_method": return "outline"
+        case "requires_capture": return "outline"
+        case "requires_action": return "outline"
+        case "requires_confirmation": return "outline"
         default: return "outline"
     }
+}
+
+const paymentLabels: Record<string, string> = {
+    succeeded: "Paid",
+    processing: "Processing",
+    canceled: "Canceled",
+    requires_payment_method: "Payment Required",
 }
 
 export default function UserOrdersPage() {
     const [page, setPage] = useState(1)
     const [perPage, setPerPage] = useState(20)
 
-    const params: Record<string, string | number> = { page, limit: perPage }
+    const params: Record<string, string | number> = { page, limit: perPage, include: 'items,items.product' }
     const { orders, meta, loading, error } = useOrders(params)
 
     const columns: Column<OrderEntity>[] = [
@@ -53,7 +63,12 @@ export default function UserOrdersPage() {
         {
             key: "items",
             header: "Articles",
-            render: (row) => <CellMuted>{row.items.length}</CellMuted>,
+            render: (row) => (
+                <CellStack
+                    primary={`${row.items.length} article${row.items.length !== 1 ? "s" : ""}`}
+                    secondary={row.items.map((i) => i.product?.name ?? i.productId.slice(0, 8)).join(", ")}
+                />
+            ),
         },
         {
             key: "total",
@@ -71,7 +86,9 @@ export default function UserOrdersPage() {
             key: "payment",
             header: "Payment",
             render: (row) => (
-                <Badge variant={paymentVariant(row.paymentStatus)}>{row.paymentStatus}</Badge>
+                <Badge variant={paymentVariant(row.paymentStatus)}>
+                    {paymentLabels[row.paymentStatus] || row.paymentStatus}
+                </Badge>
             ),
         },
         {

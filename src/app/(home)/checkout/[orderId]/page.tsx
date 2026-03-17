@@ -2,6 +2,7 @@
 
 import { use, useState, useEffect, useCallback } from "react"
 import Link from "next/link"
+import { useSession } from "next-auth/react"
 import { loadStripe } from "@stripe/stripe-js"
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js"
 import { useOrder } from "@/hooks/useOrder"
@@ -9,11 +10,14 @@ import { useOrderStore } from "@/stores/order.store"
 import DataState from "@/components/DataState"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, CreditCard, Loader2, CheckCircle2, Clock, XCircle } from "lucide-react"
+import { ArrowLeft, CreditCard, Loader2, CheckCircle2, Clock, XCircle, MapPin } from "lucide-react"
 import { mapOrder } from "@/lib/mappers/order.mapper"
 import { useCountdown } from "@/hooks/useCountdown"
+import type { OrderEntity } from "@/types/models/order"
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
@@ -64,21 +68,62 @@ function PaymentForm({ orderId, totalPrice }: { orderId: string; totalPrice: str
                 {paying ? (
                     <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Payment in progress...</>
                 ) : (
-                    <><CreditCard className="w-4 h-4 mr-2" /> Pay {parseFloat(totalPrice).toFixed(2)} €</>
+                    <><CreditCard className="w-4 h-4 mr-2" /> Pay {parseFloat(totalPrice).toFixed(2)} &euro;</>
                 )}
             </Button>
         </form>
     )
 }
 
+function hasShippingAddress(order: OrderEntity): boolean {
+    return !!(order.shippingFirstName && order.shippingLastName && order.shippingStreet && order.shippingCity && order.shippingZipCode && order.shippingCountry)
+}
+
 export default function CheckoutPage({ params }: { params: Promise<{ orderId: string }> }) {
     const { orderId } = use(params)
     const { order, loading, error } = useOrder(orderId)
+    const { data: session } = useSession()
     const [clientSecret, setClientSecret] = useState<string | null>(null)
     const [intentError, setIntentError] = useState<string | null>(null)
     const [intentLoading, setIntentLoading] = useState(false)
     const [syncing, setSyncing] = useState(false)
     const invalidate = useOrderStore((s) => s.invalidate)
+
+    // Address form state
+    const [addressSaved, setAddressSaved] = useState(false)
+    const [addressSaving, setAddressSaving] = useState(false)
+    const [addressError, setAddressError] = useState<string | null>(null)
+    const [firstName, setFirstName] = useState("")
+    const [lastName, setLastName] = useState("")
+    const [street, setStreet] = useState("")
+    const [city, setCity] = useState("")
+    const [zipCode, setZipCode] = useState("")
+    const [country, setCountry] = useState("")
+    const [phone, setPhone] = useState("")
+
+    // Prefill address from order (if already saved) or from session user data
+    const [prefilled, setPrefilled] = useState(false)
+    useEffect(() => {
+        if (prefilled) return
+        if (!order) return
+
+        if (hasShippingAddress(order)) {
+            setFirstName(order.shippingFirstName ?? "")
+            setLastName(order.shippingLastName ?? "")
+            setStreet(order.shippingStreet ?? "")
+            setCity(order.shippingCity ?? "")
+            setZipCode(order.shippingZipCode ?? "")
+            setCountry(order.shippingCountry ?? "")
+            setPhone(order.shippingPhone ?? "")
+            setAddressSaved(true)
+            setPrefilled(true)
+        } else if (session?.user) {
+            const nameParts = (session.user.name ?? "").split(" ")
+            setFirstName(nameParts[0] ?? "")
+            setLastName(nameParts.slice(1).join(" ") ?? "")
+            setPrefilled(true)
+        }
+    }, [order, session, prefilled])
 
     const countdown = useCountdown(order?.expiresAt)
     const isExpired = order?.status === "canceled" || (countdown?.expired ?? false)
@@ -114,9 +159,11 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
         }
     }, [syncPayment])
 
+    // Only create payment intent after address is saved
     useEffect(() => {
         if (!order || order.paymentStatus === "succeeded" || order.status === "canceled" || syncing) return
         if (countdown?.expired) return
+        if (!addressSaved) return
 
         setIntentLoading(true)
         setIntentError(null)
@@ -136,7 +183,46 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
             })
             .catch(() => setIntentError("Network error."))
             .finally(() => setIntentLoading(false))
-    }, [order, syncing, countdown?.expired])
+    }, [order, syncing, countdown?.expired, addressSaved])
+
+    const handleAddressSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setAddressSaving(true)
+        setAddressError(null)
+
+        try {
+            const res = await fetch(`/api/orders/${orderId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    shippingFirstName: firstName,
+                    shippingLastName: lastName,
+                    shippingStreet: street,
+                    shippingCity: city,
+                    shippingZipCode: zipCode,
+                    shippingCountry: country,
+                    shippingPhone: phone || undefined,
+                }),
+            })
+
+            if (!res.ok) {
+                const json = await res.json()
+                setAddressError(json?.error?.message || "Failed to save address.")
+                return
+            }
+
+            const json = await res.json()
+            const updated = mapOrder(json.data)
+            useOrderStore.setState((state) => ({
+                entities: { ...state.entities, [orderId]: updated },
+            }))
+            setAddressSaved(true)
+        } catch {
+            setAddressError("Network error.")
+        } finally {
+            setAddressSaving(false)
+        }
+    }
 
     const items = order ? [order] : []
 
@@ -193,11 +279,11 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
                     {order.items.map((item, i) => (
                         <div key={item.id ?? i} className="flex items-center justify-between text-sm">
                             <div>
-                                <span className="font-medium">{item.productId}</span>
+                                <span className="font-medium">{item.product?.name ?? item.productId}</span>
                                 <span className="text-muted-foreground ml-2">x{item.quantity}</span>
                             </div>
                             <span className="font-medium">
-                                {(parseFloat(item.price) * item.quantity).toFixed(2)} €
+                                {(parseFloat(item.price) * item.quantity).toFixed(2)} &euro;
                             </span>
                         </div>
                     ))}
@@ -206,10 +292,136 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
 
                     <div className="flex items-center justify-between font-bold text-base">
                         <span>Total</span>
-                        <span>{parseFloat(order.totalPrice).toFixed(2)} €</span>
+                        <span>{parseFloat(order.totalPrice).toFixed(2)} &euro;</span>
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Shipping Address */}
+            {!isPaid && !isExpired && (
+                <Card className="mb-6">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <MapPin className="w-5 h-5" />
+                            Shipping Address
+                            {addressSaved && (
+                                <Badge variant="secondary" className="ml-auto">Saved</Badge>
+                            )}
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {addressSaved ? (
+                            <div className="space-y-1 text-sm">
+                                <p className="font-medium">{firstName} {lastName}</p>
+                                <p>{street}</p>
+                                <p>{zipCode} {city}</p>
+                                <p>{country}</p>
+                                {phone && <p>{phone}</p>}
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="mt-3"
+                                    onClick={() => setAddressSaved(false)}
+                                >
+                                    Edit address
+                                </Button>
+                            </div>
+                        ) : (
+                            <form onSubmit={handleAddressSubmit} className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="firstName">First name *</Label>
+                                        <Input
+                                            id="firstName"
+                                            value={firstName}
+                                            onChange={(e) => setFirstName(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="lastName">Last name *</Label>
+                                        <Input
+                                            id="lastName"
+                                            value={lastName}
+                                            onChange={(e) => setLastName(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="street">Street *</Label>
+                                    <Input
+                                        id="street"
+                                        value={street}
+                                        onChange={(e) => setStreet(e.target.value)}
+                                        required
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="zipCode">Zip code *</Label>
+                                        <Input
+                                            id="zipCode"
+                                            value={zipCode}
+                                            onChange={(e) => setZipCode(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="city">City *</Label>
+                                        <Input
+                                            id="city"
+                                            value={city}
+                                            onChange={(e) => setCity(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="country">Country *</Label>
+                                        <Input
+                                            id="country"
+                                            value={country}
+                                            onChange={(e) => setCountry(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="phone">Phone</Label>
+                                        <Input
+                                            id="phone"
+                                            value={phone}
+                                            onChange={(e) => setPhone(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+
+                                {addressError && (
+                                    <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                                        {addressError}
+                                    </div>
+                                )}
+
+                                <Button
+                                    type="submit"
+                                    className="w-full"
+                                    disabled={addressSaving}
+                                >
+                                    {addressSaving ? (
+                                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</>
+                                    ) : (
+                                        "Continue to payment"
+                                    )}
+                                </Button>
+                            </form>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Payment section */}
             {isExpired ? (
@@ -234,7 +446,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
                         </Link>
                     </CardContent>
                 </Card>
-            ) : (
+            ) : addressSaved ? (
                 <Card>
                     <CardHeader>
                         <CardTitle>Payment</CardTitle>
@@ -271,7 +483,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
                         )}
                     </CardContent>
                 </Card>
-            )}
+            ) : null}
         </div>
     )
 }

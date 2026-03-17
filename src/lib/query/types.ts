@@ -49,13 +49,3 @@ export interface PaginatedResult<T> {
     hasPreviousPage: boolean
   }
 }
-
-export interface CursorPaginatedResult<T> {
-  data: T[]
-  meta: {
-    nextCursor: string | null
-    prevCursor: string | null
-    hasNextPage: boolean
-    hasPreviousPage: boolean
-  }
-}

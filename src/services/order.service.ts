@@ -2,7 +2,8 @@ import { orderRepository } from '@/repositories/order.repository'
 import { cartRepository } from '@/repositories/cart.repository'
 import { productRepository } from '@/repositories/product.repository'
 import { stripe } from '@/lib/stripe'
-import { NotFoundError, BadRequestError } from '@/utils/errors'
+import { NotFoundError, BadRequestError, ForbiddenError } from '@/utils/errors'
+import type { ShippingAddress } from '@/validations/order.schema'
 import type { QueryParams } from '@/lib/query/types'
 import type { OrderStatus, PaymentStatus } from '@prisma/client'
 
@@ -100,6 +101,31 @@ class OrderService {
         await cartRepository.clearItems(cart.id)
 
         return order
+    }
+
+    /**
+     * Update shipping address on a pending order. Only the order owner can do this.
+     */
+    async updateShippingAddress(id: string, userId: string, data: ShippingAddress) {
+        const order = await orderRepository.findById(id)
+
+        if (!order) {
+            throw new NotFoundError('Order not found')
+        }
+
+        if (order.userId !== userId) {
+            throw new ForbiddenError()
+        }
+
+        if (order.status !== 'pending') {
+            throw new BadRequestError('Cannot update address for this order')
+        }
+
+        if (order.paymentStatus === 'succeeded') {
+            throw new BadRequestError('Order is already paid')
+        }
+
+        return orderRepository.update(id, data as any)
     }
 
     async updateStatus(id: string, status: OrderStatus) {

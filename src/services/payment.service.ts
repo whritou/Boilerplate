@@ -55,6 +55,10 @@ class PaymentService {
             throw new BadRequestError('Order is already paid')
         }
 
+        if (!order.shippingFirstName || !order.shippingLastName || !order.shippingStreet || !order.shippingCity || !order.shippingZipCode || !order.shippingCountry) {
+            throw new BadRequestError('Shipping address is required before payment')
+        }
+
         if (order.expiresAt && order.expiresAt <= new Date() && order.status === 'pending') {
             const { orderService } = await import('@/services/order.service')
             await orderService.cancelExpired(orderId)
