@@ -4,11 +4,37 @@ import { use, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useProduct } from "@/hooks/useProduct"
-import DataState from "@/components/DataState"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, ShoppingCart } from "lucide-react"
+import { Separator } from "@/components/ui/separator"
+import { Skeleton } from "@/components/ui/skeleton"
+import { ArrowLeft, ShoppingCart, Minus, Plus, Check, PackageOpen, AlertCircle } from "lucide-react"
 import { useCartStore } from "@/stores/cart.store"
+
+function ProductDetailSkeleton() {
+    return (
+        <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
+            <Skeleton className="aspect-square w-full rounded-xl" />
+            <div className="space-y-6">
+                <div className="space-y-3">
+                    <Skeleton className="h-8 w-3/4" />
+                    <Skeleton className="h-9 w-32" />
+                </div>
+                <Skeleton className="h-5 w-24 rounded-full" />
+                <div className="space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-2/3" />
+                </div>
+                <Separator />
+                <div className="space-y-4">
+                    <Skeleton className="h-10 w-36" />
+                    <Skeleton className="h-11 w-48" />
+                </div>
+            </div>
+        </div>
+    )
+}
 
 export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params)
@@ -43,7 +69,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         setAdding(false)
 
         if (!result) {
-            setAddError(storeError || "Cannot add to cart, please trt again.")
+            setAddError(storeError || "Unable to add to cart. Please try again.")
             return
         }
 
@@ -51,110 +77,176 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         setTimeout(() => setAdded(false), 2000)
     }
 
-    const items = product ? [product] : []
-
-    if (loading || error || !product) {
-        return (
-            <div className="container mx-auto px-4 py-8">
-                <Link href="/products" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6">
-                    <ArrowLeft className="w-4 h-4" /> Go back to products page
-                </Link>
-                <DataState
-                    loading={loading}
-                    error={error}
-                    data={items}
-                    loadingMessage="Loading the product..."
-                    errorMessage="Impossible to load product."
-                    emptyMessage="Product not found."
-                />
-            </div>
-        )
-    }
+    const outOfStock = product ? product.quantity <= 0 : false
 
     return (
-        <div className="container mx-auto px-4 py-8">
-            <Link href="/products" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6">
-                <ArrowLeft className="w-4 h-4" /> Go back to products page
-            </Link>
+        <main className="container mx-auto px-4 py-10">
+            <nav aria-label="Back to products">
+                <Link
+                    href="/products"
+                    className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                >
+                    <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                    Back to products
+                </Link>
+            </nav>
 
-            <div className="grid md:grid-cols-2 gap-8 mt-4">
-                <div className="relative aspect-square rounded-xl overflow-hidden bg-muted">
-                    {product.imageUrl ? (
-                        <Image
-                            src={product.imageUrl}
-                            alt={product.name}
-                            fill
-                            className="object-cover"
-                            sizes="(max-width: 768px) 100vw, 50vw"
-                            priority
-                        />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                            <span className="text-muted-foreground">No image available for this product</span>
-                        </div>
-                    )}
-                </div>
+            <div className="mt-8">
+                {loading && <ProductDetailSkeleton />}
 
-                <div className="flex flex-col gap-4">
-                    <h1 className="text-3xl font-bold">{product.name}</h1>
-
-                    <p className="text-3xl font-bold text-primary">{product.price.toFixed(2)} €</p>
-
-                    <div className="flex items-center gap-2">
-                        {product.quantity > 0 ? (
-                            <Badge variant="secondary">
-                                {product.quantity > 10 ? "En stock" : `Plus que ${product.quantity} en stock`}
-                            </Badge>
-                        ) : (
-                            <Badge variant="destructive">Out of stock</Badge>
-                        )}
-                    </div>
-
-                    {product.description && (
-                        <p className="text-muted-foreground leading-relaxed">{product.description}</p>
-                    )}
-
-                    <div className="mt-4 flex flex-col gap-4">
-                        {/* Quantity selector */}
-                        <div className="flex items-center gap-3">
-                            <Button variant="outline" onClick={decrease} disabled={quantity <= 1}>
-                                -
-                            </Button>
-
-                            <span className="text-lg font-semibold w-10 text-center">
-            {quantity}
-        </span>
-
-                            <Button
-                                variant="outline"
-                                onClick={increase}
-                                disabled={!product || quantity >= product.quantity}
-                            >
-                                +
-                            </Button>
-                        </div>
-
-                        {/* Add to cart */}
-                        <Button
-                            size="lg"
-                            onClick={handleAddToCart}
-                            disabled={adding || product.quantity <= 0}
-                            className="sm:w-1/2"
-                        >
-                            <ShoppingCart className="w-4 h-4 mr-2" />
-                            {adding
-                                ? "Adding to cart..."
-                                : added
-                                    ? "Added !"
-                                    : `Add ${quantity} to cart`}
+                {error && (
+                    <div
+                        role="alert"
+                        className="flex flex-col items-center justify-center gap-3 py-20 text-center"
+                    >
+                        <AlertCircle className="h-12 w-12 text-destructive/60" aria-hidden="true" />
+                        <p className="text-muted-foreground">Unable to load this product.</p>
+                        <Button variant="outline" asChild>
+                            <Link href="/products">Browse products</Link>
                         </Button>
-
-                        {addError && (
-                            <p className="text-sm text-destructive">{addError}</p>
-                        )}
                     </div>
-                </div>
+                )}
+
+                {!loading && !error && !product && (
+                    <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
+                        <PackageOpen className="h-12 w-12 text-muted-foreground/40" aria-hidden="true" />
+                        <p className="text-muted-foreground">Product not found.</p>
+                        <Button variant="outline" asChild>
+                            <Link href="/products">Browse products</Link>
+                        </Button>
+                    </div>
+                )}
+
+                {product && (
+                    <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
+                        {/* Image */}
+                        <div className="relative aspect-square overflow-hidden rounded-xl bg-muted">
+                            {product.imageUrl ? (
+                                <Image
+                                    src={product.imageUrl}
+                                    alt={product.name}
+                                    fill
+                                    className="object-cover"
+                                    sizes="(max-width: 768px) 100vw, 50vw"
+                                    priority
+                                />
+                            ) : (
+                                <div className="flex h-full items-center justify-center">
+                                    <PackageOpen className="h-16 w-16 text-muted-foreground/30" aria-hidden="true" />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Details */}
+                        <div className="flex flex-col">
+                            <div className="space-y-4">
+                                <h1 className="text-3xl font-bold tracking-tight">
+                                    {product.name}
+                                </h1>
+
+                                <p className="text-3xl font-bold tabular-nums" aria-label={`Price: ${product.price.toFixed(2)} euros`}>
+                                    {product.price.toFixed(2)}&nbsp;&euro;
+                                </p>
+
+                                <div>
+                                    {outOfStock ? (
+                                        <Badge variant="destructive">Out of stock</Badge>
+                                    ) : product.quantity <= 5 ? (
+                                        <Badge variant="outline">Only {product.quantity} left</Badge>
+                                    ) : (
+                                        <Badge variant="secondary">In stock</Badge>
+                                    )}
+                                </div>
+                            </div>
+
+                            {product.description && (
+                                <>
+                                    <Separator className="my-6" />
+                                    <div className="space-y-1">
+                                        <h2 className="text-sm font-medium text-muted-foreground">Description</h2>
+                                        <p className="text-sm leading-relaxed">
+                                            {product.description}
+                                        </p>
+                                    </div>
+                                </>
+                            )}
+
+                            <Separator className="my-6" />
+
+                            {/* Add to cart */}
+                            <div className="space-y-4">
+                                {!outOfStock && (
+                                    <fieldset>
+                                        <legend className="text-sm font-medium text-muted-foreground mb-2">
+                                            Quantity
+                                        </legend>
+                                        <div className="inline-flex items-center rounded-lg border">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-10 w-10 rounded-r-none"
+                                                onClick={decrease}
+                                                disabled={quantity <= 1}
+                                                aria-label="Decrease quantity"
+                                            >
+                                                <Minus className="h-4 w-4" aria-hidden="true" />
+                                            </Button>
+                                            <span
+                                                className="flex h-10 w-12 items-center justify-center text-sm font-medium tabular-nums border-x"
+                                                aria-live="polite"
+                                                aria-label={`Quantity: ${quantity}`}
+                                            >
+                                                {quantity}
+                                            </span>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-10 w-10 rounded-l-none"
+                                                onClick={increase}
+                                                disabled={quantity >= product.quantity}
+                                                aria-label="Increase quantity"
+                                            >
+                                                <Plus className="h-4 w-4" aria-hidden="true" />
+                                            </Button>
+                                        </div>
+                                    </fieldset>
+                                )}
+
+                                <Button
+                                    size="lg"
+                                    className="w-full sm:w-auto"
+                                    onClick={handleAddToCart}
+                                    disabled={adding || outOfStock || added}
+                                    aria-live="polite"
+                                >
+                                    {adding ? (
+                                        <>
+                                            <ShoppingCart className="mr-2 h-4 w-4 animate-pulse" aria-hidden="true" />
+                                            Adding...
+                                        </>
+                                    ) : added ? (
+                                        <>
+                                            <Check className="mr-2 h-4 w-4" aria-hidden="true" />
+                                            Added to cart
+                                        </>
+                                    ) : (
+                                        <>
+                                            <ShoppingCart className="mr-2 h-4 w-4" aria-hidden="true" />
+                                            {outOfStock ? "Out of stock" : `Add to cart`}
+                                        </>
+                                    )}
+                                </Button>
+
+                                {addError && (
+                                    <p role="alert" className="text-sm text-destructive">
+                                        {addError}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
-        </div>
+        </main>
     )
 }

@@ -18,29 +18,6 @@ class ProductService {
         return product
     }
 
-    async getByName(name: string) {
-        const product = await productRepository.findByName(name)
-
-        if (!product) {
-            throw new NotFoundError('Product not found')
-        }
-
-        return product
-    }
-
-    async getFullDetails(id: string) {
-        const product = await productRepository.findWithFullDetails(id)
-
-        if (!product) {
-            throw new NotFoundError('Product not found')
-        }
-        return product
-    }
-
-    async getAvailable() {
-        return productRepository.findAvailable()
-    }
-
     async create(data: Prisma.ProductCreateInput) {
         const existing = await productRepository.findByName(data.name)
 
@@ -67,36 +44,6 @@ class ProductService {
         if (!ok) {
             throw new NotFoundError('Product not found')
         }
-    }
-
-    async archive(id: string) {
-        const product = await productRepository.archive(id)
-
-        if (!product) {
-            throw new NotFoundError('Product not found')
-        }
-
-        return product
-    }
-
-    async unarchive(id: string) {
-        const product = await productRepository.unarchive(id)
-
-        if (!product) {
-            throw new NotFoundError('Product not found')
-        }
-
-        return product
-    }
-
-    async updateStock(id: string, quantity: number) {
-        const product = await productRepository.updateStock(id, quantity)
-
-        if (!product) {
-            throw new NotFoundError('Product not found')
-        }
-
-        return product
     }
 
     async decrementStock(id: string, quantity: number) {

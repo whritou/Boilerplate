@@ -13,45 +13,7 @@ import { FilterSelect } from "@/components/table/filter-select"
 import DataState from "@/components/DataState"
 import { Badge } from "@/components/ui/badge"
 import { OrderDetailsModal } from "@/components/orders/OrderDetailsModal"
-
-const statusOptions = [
-    { value: "pending", label: "Pending" },
-    { value: "confirmed", label: "Confirmed" },
-    { value: "shipped", label: "Shipped" },
-    { value: "delivered", label: "Delivered" },
-    { value: "canceled", label: "Canceled" },
-]
-
-const statusVariant = (status: string) => {
-    switch (status) {
-        case "pending": return "outline"
-        case "confirmed": return "default"
-        case "shipped": return "secondary"
-        case "delivered": return "default"
-        case "canceled": return "destructive"
-        default: return "outline"
-    }
-}
-
-const paymentVariant = (status: string) => {
-    switch (status) {
-        case "succeeded": return "default"
-        case "processing": return "outline"
-        case "canceled": return "destructive"
-        case "requires_payment_method": return "outline"
-        case "requires_capture": return "outline"
-        case "requires_action": return "outline"
-        case "requires_confirmation": return "outline"
-        default: return "outline"
-    }
-}
-
-const paymentLabels: Record<string, string> = {
-    succeeded: "Paid",
-    processing: "Processing",
-    canceled: "Canceled",
-    requires_payment_method: "Payment Required",
-}
+import { statusOptions, statusVariant, paymentVariant, paymentLabels} from "@/utils/orderStatus"
 
 export default function AdminOrdersPage() {
     const [page, setPage] = useState(1)

@@ -20,13 +20,6 @@ class PaymentRepository extends BaseRepository<
         }
     }
 
-    async findByOrderId(orderId: string) {
-        return prisma.payment.findUnique({
-            where: { orderId },
-            include: { order: true },
-        })
-    }
-
     async findByStripePaymentIntentId(stripePaymentIntentId: string) {
         return prisma.payment.findFirst({
             where: { stripePaymentIntentId },

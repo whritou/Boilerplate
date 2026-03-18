@@ -20,26 +20,6 @@ class PaymentService {
         return payment
     }
 
-    async getByOrderId(orderId: string) {
-        const payment = await paymentRepository.findByOrderId(orderId)
-
-        if (!payment) {
-            throw new NotFoundError('Payment not found')
-        }
-
-        return payment
-    }
-
-    async getByStripePaymentIntentId(stripePaymentIntentId: string) {
-        const payment = await paymentRepository.findByStripePaymentIntentId(stripePaymentIntentId)
-
-        if (!payment) {
-            throw new NotFoundError('Payment not found')
-        }
-
-        return payment
-    }
-
     /**
      * Creates a Stripe PaymentIntent for embedded payment on the checkout page.
      * Returns the client secret needed by Stripe Elements.

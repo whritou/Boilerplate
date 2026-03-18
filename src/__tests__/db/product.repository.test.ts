@@ -66,18 +66,6 @@ describe('ProductRepository', () => {
         })
     })
 
-    describe('archive', () => {
-        it('sets isArchived to true', async () => {
-            mockPrisma.update.mockResolvedValue({ ...sampleProduct, isArchived: true })
-            const result = await productRepository.archive('prod-1')
-            expect(result.isArchived).toBe(true)
-            expect(mockPrisma.update).toHaveBeenCalledWith({
-                where: { id: 'prod-1' },
-                data: { isArchived: true },
-            })
-        })
-    })
-
     describe('decrementStock', () => {
         it('decrements quantity by amount', async () => {
             mockPrisma.update.mockResolvedValue({ ...sampleProduct, quantity: 5 })

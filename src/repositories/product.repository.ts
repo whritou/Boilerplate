@@ -49,37 +49,6 @@ class ProductRepository extends BaseRepository<
         })
     }
 
-    async findWithFullDetails(id: string) {
-        return prisma.product.findUnique({
-            where: { id },
-            select: {
-                ...ProductRepository.defaultSelect,
-                description: true,
-            },
-        })
-    }
-
-    async archive(id: string) {
-        return prisma.product.update({
-            where: { id },
-            data: { isArchived: true },
-        })
-    }
-
-    async unarchive(id: string) {
-        return prisma.product.update({
-            where: { id },
-            data: { isArchived: false },
-        })
-    }
-
-    async updateStock(id: string, quantity: number) {
-        return prisma.product.update({
-            where: { id },
-            data: { quantity },
-        })
-    }
-
     async decrementStock(id: string, quantity: number) {
         return prisma.product.update({
             where: { id },

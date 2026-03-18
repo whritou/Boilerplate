@@ -10,37 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Eye } from "lucide-react"
 import { useOrders } from "@/hooks/useOrder"
-
-const statusVariant = (status: string) => {
-    switch (status) {
-        case "pending": return "outline"
-        case "confirmed": return "default"
-        case "shipped": return "secondary"
-        case "delivered": return "default"
-        case "canceled": return "destructive"
-        default: return "outline"
-    }
-}
-
-const paymentVariant = (status: string) => {
-    switch (status) {
-        case "succeeded": return "default"
-        case "processing": return "outline"
-        case "canceled": return "destructive"
-        case "requires_payment_method": return "outline"
-        case "requires_capture": return "outline"
-        case "requires_action": return "outline"
-        case "requires_confirmation": return "outline"
-        default: return "outline"
-    }
-}
-
-const paymentLabels: Record<string, string> = {
-    succeeded: "Paid",
-    processing: "Processing",
-    canceled: "Canceled",
-    requires_payment_method: "Payment Required",
-}
+import { statusVariant, paymentVariant, paymentLabels} from "@/utils/orderStatus"
 
 export default function UserOrdersPage() {
     const [page, setPage] = useState(1)
