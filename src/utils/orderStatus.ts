@@ -14,6 +14,7 @@ export const paymentVariant = (status: string) => {
         case "succeeded": return "default"
         case "processing": return "outline"
         case "canceled": return "destructive"
+        case "refunded": return "destructive"
         case "requires_payment_method": return "outline"
         case "requires_capture": return "outline"
         case "requires_action": return "outline"
@@ -26,6 +27,7 @@ export const paymentLabels: Record<string, string> = {
     succeeded: "Paid",
     processing: "Processing",
     canceled: "Canceled",
+    refunded: "Refunded",
     requires_payment_method: "Payment Required",
 }
 

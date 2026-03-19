@@ -31,6 +31,7 @@ export default function AdminOrdersPage() {
 
     const { orders, meta, loading, error } = useOrders(params)
     const storeError = useOrderStore((s) => s.error)
+    const invalidate = useOrderStore((s) => s.invalidate)
 
     const columns: Column<OrderEntity>[] = [
         {
@@ -157,6 +158,10 @@ export default function AdminOrdersPage() {
                 order={selectedOrder}
                 open={open}
                 onOpenChange={setOpen}
+                onRefunded={() => {
+                    invalidate()
+                    setSelectedOrder(null)
+                }}
             />
         </div>
     )

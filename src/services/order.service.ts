@@ -1,7 +1,9 @@
 import { orderRepository } from '@/repositories/order.repository'
 import { cartRepository } from '@/repositories/cart.repository'
 import { productRepository } from '@/repositories/product.repository'
+import { prisma } from '@/lib/db/prisma'
 import { stripe } from '@/lib/stripe'
+import { mailService } from '@/services/mail.service'
 import { NotFoundError, BadRequestError, ForbiddenError } from '@/utils/errors'
 import type { ShippingAddress } from '@/validations/order.schema'
 import type { QueryParams } from '@/lib/query/types'
@@ -33,16 +35,6 @@ class OrderService {
 
     async getByUserId(userId: string) {
         return orderRepository.findByUserId(userId)
-    }
-
-    async getByStripePaymentIntentId(stripePaymentIntentId: string) {
-        const order = await orderRepository.findByStripePaymentIntentId(stripePaymentIntentId)
-
-        if (!order) {
-            throw new NotFoundError('Order not found')
-        }
-
-        return order
     }
 
     /**
@@ -214,6 +206,94 @@ class OrderService {
 
         await orderRepository.updateStatus(id, 'canceled')
         await orderRepository.updatePaymentStatus(id, 'canceled')
+    }
+
+    /**
+     * Admin-initiated cancel + full refund.
+     * Issues a Stripe refund, updates DB atomically, then sends email.
+     * Email failure does NOT roll back the refund.
+     */
+    async cancelAndRefund(id: string) {
+        const order = await orderRepository.findWithDetails(id)
+
+        if (!order) {
+            throw new NotFoundError('Order not found')
+        }
+
+        if (order.status === 'canceled') {
+            throw new BadRequestError('Order is already cancelled')
+        }
+
+        if (order.paymentStatus === 'refunded') {
+            throw new BadRequestError('Order is already refunded')
+        }
+
+        if (order.paymentStatus !== 'succeeded') {
+            throw new BadRequestError('Cannot refund an order that has not been paid')
+        }
+
+        if (!order.stripePaymentIntentId) {
+            throw new BadRequestError('No payment intent found for this order')
+        }
+
+        // Check for existing partial refunds on Stripe side
+        const existingRefunds = await stripe.refunds.list({
+            payment_intent: order.stripePaymentIntentId,
+            limit: 1,
+        })
+
+        if (existingRefunds.data.length > 0) {
+            throw new BadRequestError('A partial refund already exists — manual review on stripe required')
+        }
+
+        // Issue Stripe refund with idempotency key
+        let refund
+        try {
+            refund = await stripe.refunds.create(
+                {
+                    payment_intent: order.stripePaymentIntentId,
+                    reason: 'requested_by_customer',
+                },
+                { idempotencyKey: `refund-${id}` },
+            )
+        } catch (err: any) {
+            const message = err?.message || 'Stripe refund failed'
+            console.error(`[Order] Stripe refund failed for order ${id}:`, err)
+            throw new BadRequestError(`Refund failed: ${message}`)
+        }
+
+        // Atomic DB update — order canceled + payment refunded + store refund ID
+        await prisma.$transaction([
+            prisma.order.update({
+                where: { id },
+                data: { status: 'canceled', paymentStatus: 'refunded' },
+            }),
+            prisma.payment.update({
+                where: { orderId: id },
+                data: { status: 'refunded', stripeRefundId: refund.id },
+            }),
+        ])
+
+        // Restore stock
+        for (const item of order.items) {
+            await productRepository.incrementStock(item.productId, item.quantity)
+        }
+
+        // Send email — failure is logged but does NOT roll back the refund
+        try {
+            const user = await prisma.user.findUnique({ where: { id: order.userId } })
+            if (user?.email) {
+                await mailService.sendOrderRefundEmail(
+                    user.email,
+                    order.id,
+                    order.totalPrice.toFixed(2),
+                )
+            }
+        } catch (err) {
+            console.error(`[Order] Failed to send refund email for order ${id}:`, err)
+        }
+
+        return orderRepository.findWithDetails(id)
     }
 
     /**

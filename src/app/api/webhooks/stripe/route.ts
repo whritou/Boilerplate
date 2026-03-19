@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { stripe } from '@/lib/stripe'
 import { paymentService } from '@/services/payment.service'
+import { orderRepository } from '@/repositories/order.repository'
 import type { PaymentStatus } from '@prisma/client'
+
+// Stripe signature verification requires Node.js crypto — must not run on Edge
+export const runtime = 'nodejs'
 
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET
 if (!WEBHOOK_SECRET) {
@@ -63,6 +67,23 @@ export async function POST(req: NextRequest) {
                         status,
                         paymentIntent.amount_received,
                     )
+                }
+                break
+            }
+
+            case 'charge.dispute.created': {
+                const dispute = event.data.object
+                const piId = typeof dispute.payment_intent === 'string'
+                    ? dispute.payment_intent
+                    : dispute.payment_intent?.id
+
+                if (piId) {
+                    const order = await orderRepository.findByStripePaymentIntentId(piId)
+                    if (order) {
+                        await orderRepository.updateStatus(order.id, 'canceled')
+                        await orderRepository.updatePaymentStatus(order.id, 'canceled')
+                        console.warn(`[Stripe Webhook] Dispute created for order ${order.id}, payment intent ${piId}`)
+                    }
                 }
                 break
             }

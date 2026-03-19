@@ -8,7 +8,8 @@ export const paymentStatusEnum = z.enum([
     "processing",
     "requires_capture",
     "canceled",
-    "succeeded"
+    "succeeded",
+    "refunded"
 ])
 
 export const orderStatusEnum = z.enum([

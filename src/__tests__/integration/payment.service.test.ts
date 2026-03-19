@@ -19,6 +19,7 @@ vi.mock('@/lib/stripe', () => ({
 vi.mock('@/repositories/payment.repository', () => ({
     paymentRepository: {
         findById: vi.fn(),
+        findOne: vi.fn(),
         findByStripePaymentIntentId: vi.fn(),
         create: vi.fn(),
         updateStatus: vi.fn(),
@@ -149,6 +150,7 @@ describe('PaymentService.createPaymentIntent', () => {
 describe('PaymentService.handleStripeWebhook', () => {
     it('creates payment for new payment intent', async () => {
         mockPaymentRepo.findByStripePaymentIntentId.mockResolvedValue(null)
+        mockPaymentRepo.findOne.mockResolvedValue(null)
         mockOrderRepo.findByStripePaymentIntentId.mockResolvedValue(sampleOrder)
         mockOrderRepo.findById.mockResolvedValue(sampleOrder)
         mockPaymentRepo.create.mockResolvedValue({ id: 'pay-1', status: 'succeeded' })
@@ -239,6 +241,7 @@ describe('PaymentService.syncPaymentStatus', () => {
         mockOrderRepo.updateStatus.mockResolvedValue({})
         mockOrderRepo.update.mockResolvedValue({})
         mockPaymentRepo.findByStripePaymentIntentId.mockResolvedValue(null)
+        mockPaymentRepo.findOne.mockResolvedValue(null)
         mockPaymentRepo.create.mockResolvedValue({})
 
         const result = await paymentService.syncPaymentStatus('ord-1')

@@ -6,6 +6,32 @@ vi.mock('@/lib/stripe', () => ({
         paymentIntents: {
             cancel: vi.fn(),
         },
+        refunds: {
+            create: vi.fn(),
+            list: vi.fn(),
+        },
+    },
+}))
+
+vi.mock('@/lib/db/prisma', () => ({
+    prisma: {
+        $transaction: vi.fn(),
+        order: { update: vi.fn() },
+        payment: { update: vi.fn() },
+        user: { findUnique: vi.fn() },
+    },
+}))
+
+vi.mock('@/repositories/payment.repository', () => ({
+    paymentRepository: {
+        findByStripePaymentIntentId: vi.fn(),
+        updateStatus: vi.fn(),
+    },
+}))
+
+vi.mock('@/services/mail.service', () => ({
+    mailService: {
+        sendOrderRefundEmail: vi.fn(),
     },
 }))
 
@@ -44,10 +70,16 @@ import { orderService } from '@/services/order.service'
 import { orderRepository } from '@/repositories/order.repository'
 import { cartRepository } from '@/repositories/cart.repository'
 import { productRepository } from '@/repositories/product.repository'
+import { stripe } from '@/lib/stripe'
+import { prisma } from '@/lib/db/prisma'
+import { mailService } from '@/services/mail.service'
 
 const mockOrderRepo = orderRepository as any
 const mockCartRepo = cartRepository as any
 const mockProductRepo = productRepository as any
+const mockStripe = stripe as any
+const mockPrisma = prisma as any
+const mockMail = mailService as any
 
 const sampleProduct = {
     id: 'prod-1',
@@ -199,5 +231,91 @@ describe('OrderService.updateShippingAddress', () => {
     it('throws BadRequestError when order is already paid', async () => {
         mockOrderRepo.findById.mockResolvedValue({ id: 'ord-1', userId: 'user-1', status: 'pending', paymentStatus: 'succeeded' })
         await expect(orderService.updateShippingAddress('ord-1', 'user-1', validAddress)).rejects.toThrow(BadRequestError)
+    })
+})
+
+describe('OrderService.cancelAndRefund', () => {
+    const paidOrder = {
+        id: 'ord-1',
+        userId: 'user-1',
+        totalPrice: 29.99,
+        status: 'confirmed',
+        paymentStatus: 'succeeded',
+        stripePaymentIntentId: 'pi_123',
+        items: [{ productId: 'prod-1', quantity: 2 }],
+    }
+
+    it('refunds a paid order, updates DB, restores stock, sends email', async () => {
+        mockOrderRepo.findWithDetails
+            .mockResolvedValueOnce(paidOrder)
+            .mockResolvedValueOnce({ ...paidOrder, status: 'canceled', paymentStatus: 'refunded' })
+        mockStripe.refunds.list.mockResolvedValue({ data: [] })
+        mockStripe.refunds.create.mockResolvedValue({ id: 're_123' })
+        mockPrisma.$transaction.mockResolvedValue([{}, {}])
+        mockProductRepo.incrementStock.mockResolvedValue({})
+        mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-1', email: 'john@example.com' })
+        mockMail.sendOrderRefundEmail.mockResolvedValue(undefined)
+
+        const result = await orderService.cancelAndRefund('ord-1')
+
+        expect(result!.status).toBe('canceled')
+        expect(mockStripe.refunds.create).toHaveBeenCalledWith(
+            { payment_intent: 'pi_123', reason: 'requested_by_customer' },
+            { idempotencyKey: 'refund-ord-1' },
+        )
+        expect(mockPrisma.$transaction).toHaveBeenCalled()
+        expect(mockProductRepo.incrementStock).toHaveBeenCalledWith('prod-1', 2)
+        expect(mockMail.sendOrderRefundEmail).toHaveBeenCalledWith('john@example.com', 'ord-1', '29.99')
+    })
+
+    it('throws NotFoundError when order not found', async () => {
+        mockOrderRepo.findWithDetails.mockResolvedValue(null)
+        await expect(orderService.cancelAndRefund('missing')).rejects.toThrow(NotFoundError)
+    })
+
+    it('throws BadRequestError when order is already canceled', async () => {
+        mockOrderRepo.findWithDetails.mockResolvedValue({ ...paidOrder, status: 'canceled' })
+        await expect(orderService.cancelAndRefund('ord-1')).rejects.toThrow(BadRequestError)
+    })
+
+    it('throws BadRequestError when order is already refunded', async () => {
+        mockOrderRepo.findWithDetails.mockResolvedValue({ ...paidOrder, paymentStatus: 'refunded' })
+        await expect(orderService.cancelAndRefund('ord-1')).rejects.toThrow(BadRequestError)
+    })
+
+    it('throws BadRequestError when order has not been paid', async () => {
+        mockOrderRepo.findWithDetails.mockResolvedValue({ ...paidOrder, paymentStatus: 'requires_payment_method' })
+        await expect(orderService.cancelAndRefund('ord-1')).rejects.toThrow(BadRequestError)
+    })
+
+    it('throws BadRequestError when partial refund exists on Stripe', async () => {
+        mockOrderRepo.findWithDetails.mockResolvedValue(paidOrder)
+        mockStripe.refunds.list.mockResolvedValue({ data: [{ id: 're_partial' }] })
+
+        await expect(orderService.cancelAndRefund('ord-1')).rejects.toThrow('partial refund already exists')
+    })
+
+    it('throws BadRequestError when Stripe refund fails', async () => {
+        mockOrderRepo.findWithDetails.mockResolvedValue(paidOrder)
+        mockStripe.refunds.list.mockResolvedValue({ data: [] })
+        mockStripe.refunds.create.mockRejectedValue(new Error('charge_already_refunded'))
+
+        await expect(orderService.cancelAndRefund('ord-1')).rejects.toThrow('Refund failed')
+        expect(mockPrisma.$transaction).not.toHaveBeenCalled()
+    })
+
+    it('continues if email sending fails', async () => {
+        mockOrderRepo.findWithDetails
+            .mockResolvedValueOnce(paidOrder)
+            .mockResolvedValueOnce({ ...paidOrder, status: 'canceled', paymentStatus: 'refunded' })
+        mockStripe.refunds.list.mockResolvedValue({ data: [] })
+        mockStripe.refunds.create.mockResolvedValue({ id: 're_123' })
+        mockPrisma.$transaction.mockResolvedValue([{}, {}])
+        mockProductRepo.incrementStock.mockResolvedValue({})
+        mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-1', email: 'john@example.com' })
+        mockMail.sendOrderRefundEmail.mockRejectedValue(new Error('SMTP down'))
+
+        const result = await orderService.cancelAndRefund('ord-1')
+        expect(result!.status).toBe('canceled')
     })
 })

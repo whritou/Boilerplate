@@ -35,3 +35,17 @@ export async function sendResetPasswordEmail(to: string, link: string) {
     `,
   });
 }
+
+export async function sendOrderRefundEmail(to: string, orderId: string, amount: string) {
+  await transporter.sendMail({
+    from: '"BoilerPLate" <whrite.arthur@gmail.com>',
+    to,
+    subject: "Your order has been cancelled — refund on its way",
+    html: `
+      <p>Your order <strong>#${orderId.slice(0, 8)}</strong> has been cancelled and a full refund has been issued.</p>
+      <p><strong>Refund amount:</strong> ${amount} &euro;</p>
+      <p>The refund should appear on your original payment method within <strong>5–10 business days</strong>, depending on your bank.</p>
+      <p>If you have any questions, please don't hesitate to contact us.</p>
+    `,
+  });
+}

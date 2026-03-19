@@ -109,7 +109,11 @@ class PaymentService {
         }
 
         // Check if webhook already processed this — avoid race condition
-        const existingPayment = await paymentRepository.findByStripePaymentIntentId(order.stripePaymentIntentId)
+        // Look up by stripePaymentIntentId first, then fall back to orderId
+        let existingPayment = await paymentRepository.findByStripePaymentIntentId(order.stripePaymentIntentId)
+        if (!existingPayment) {
+            existingPayment = await paymentRepository.findOne({ orderId }) as any
+        }
 
         if (existingPayment && existingPayment.status === newStatus) {
             return orderRepository.findWithDetails(orderId)
@@ -267,6 +271,12 @@ class PaymentService {
             }
         }
 
+        // Check if a payment already exists for this order (e.g. created by syncPaymentStatus)
+        const existingForOrder = await paymentRepository.findOne({ orderId: order.id }) as any
+        if (existingForOrder) {
+            return this.updateStatus(existingForOrder.id, status)
+        }
+
         return this.create({
             orderId: order.id,
             stripePaymentIntentId,
@@ -288,12 +298,13 @@ class PaymentService {
             throw new BadRequestError('Missing orderId in session metadata')
         }
 
-        const paymentIntent = session.payment_intent as { id: string; status: string } | string
+        const paymentIntent = session.payment_intent as { id: string; status: string; amount_received?: number } | string
         const intentId = typeof paymentIntent === 'string' ? paymentIntent : paymentIntent.id
+        const amountReceived = typeof paymentIntent === 'string' ? undefined : paymentIntent.amount_received
 
         await orderRepository.update(orderId, { stripePaymentIntentId: intentId })
 
-        return this.handleStripeWebhook(intentId, 'succeeded')
+        return this.handleStripeWebhook(intentId, 'succeeded', amountReceived)
     }
 }
 

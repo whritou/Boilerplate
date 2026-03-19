@@ -9,12 +9,14 @@ export const useOrder = (id: string) => {
     const fetchOrder = useOrderStore((s) => s.fetchOne)
     const loading = useOrderStore((s) => s.loading)
     const error = useOrderStore((s) => s.error)
+    const fetched = useRef(false)
 
     useEffect(() => {
-        if (!order) {
-            fetchOrder(id)
+        if (!fetched.current) {
+            fetched.current = true
+            fetchOrder(id, true)
         }
-    }, [id, order, fetchOrder])
+    }, [id, fetchOrder])
 
     return { order, loading, error }
 }

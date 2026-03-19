@@ -23,6 +23,7 @@ enum PaymentStatus {
   requires_capture
   canceled
   succeeded
+  refunded
 }
 
 enum OrderStatus {
@@ -181,6 +182,7 @@ model Payment {
   id                    String        @id @default(cuid())
   orderId               String        @unique
   stripePaymentIntentId String
+  stripeRefundId        String?       @map("stripe_refund_id")
   amount                Float         @db.DoublePrecision
   status                PaymentStatus
 

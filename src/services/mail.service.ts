@@ -1,4 +1,4 @@
-import { sendVerificationEmail, sendResetPasswordEmail } from "@/utils/mail"
+import { sendVerificationEmail, sendResetPasswordEmail, sendOrderRefundEmail } from "@/utils/mail"
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL!
 
@@ -11,6 +11,10 @@ export class MailService {
     async sendResetPasswordEmail(email: string, token: string): Promise<void> {
         const link = `${BASE_URL}/reset-password?token=${token}`
         await sendResetPasswordEmail(email, link)
+    }
+
+    async sendOrderRefundEmail(email: string, orderId: string, amount: string): Promise<void> {
+        await sendOrderRefundEmail(email, orderId, amount)
     }
 }
 

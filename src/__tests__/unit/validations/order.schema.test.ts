@@ -14,7 +14,7 @@ describe('orderStatusEnum', () => {
 describe('paymentStatusEnum', () => {
     it.each([
         'requires_payment_method', 'requires_confirmation', 'requires_action',
-        'processing', 'requires_capture', 'canceled', 'succeeded',
+        'processing', 'requires_capture', 'canceled', 'succeeded', 'refunded',
     ])('accepts "%s"', (status) => {
         expect(paymentStatusEnum.safeParse(status).success).toBe(true)
     })

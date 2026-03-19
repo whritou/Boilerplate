@@ -26,7 +26,7 @@ export interface CrudState<T> {
     lastFetch: Record<string, number>
 
     fetchMany: (params?: QueryParams) => Promise<void>
-    fetchOne: (id: string) => Promise<void>
+    fetchOne: (id: string, force?: boolean) => Promise<void>
     createOne: (data: Partial<T>) => Promise<T | null>
     updateOne: (id: string, data: Partial<T>) => Promise<T | null>
     deleteOne: (id: string) => Promise<boolean>
@@ -138,8 +138,8 @@ export function createCrudStore<T extends Identifiable>(
             }
         },
 
-        async fetchOne(id) {
-            if (get().entities[id]) return
+        async fetchOne(id, force) {
+            if (!force && get().entities[id]) return
 
             set({ loading: true, error: null })
 

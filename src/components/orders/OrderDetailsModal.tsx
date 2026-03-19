@@ -1,25 +1,67 @@
 "use client"
 
+import { useState } from "react"
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
+import { Loader2 } from "lucide-react"
 import { OrderEntity } from "@/types/models/order"
+import { statusVariant, paymentVariant, paymentLabels } from "@/utils/orderStatus"
 
 interface Props {
     order: OrderEntity | null
     open: boolean
     onOpenChange: (open: boolean) => void
+    onRefunded?: (order: OrderEntity) => void
 }
 
-export function OrderDetailsModal({ order, open, onOpenChange }: Props) {
+export function OrderDetailsModal({ order, open, onOpenChange, onRefunded }: Props) {
+    const [refunding, setRefunding] = useState(false)
+    const [refundError, setRefundError] = useState<string | null>(null)
+
     if (!order) return null
 
     const hasAddress = !!(order.shippingFirstName || order.shippingStreet)
+    const canRefund = order.status !== "canceled" && order.paymentStatus === "succeeded"
+
+    const handleRefund = async () => {
+        setRefunding(true)
+        setRefundError(null)
+
+        try {
+            const res = await fetch(`/api/orders/${order.id}/refund`, { method: "POST" })
+            const json = await res.json()
+
+            if (!res.ok) {
+                setRefundError(json?.error?.message || json?.error || "Refund failed")
+                return
+            }
+
+            onRefunded?.(json.data)
+            onOpenChange(false)
+        } catch {
+            setRefundError("Network error")
+        } finally {
+            setRefunding(false)
+        }
+    }
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -46,12 +88,14 @@ export function OrderDetailsModal({ order, open, onOpenChange }: Props) {
                     <div className="flex gap-4">
                         <div>
                             <p className="text-muted-foreground">Status</p>
-                            <Badge>{order.status}</Badge>
+                            <Badge variant={statusVariant(order.status)}>{order.status}</Badge>
                         </div>
 
                         <div>
                             <p className="text-muted-foreground">Payment</p>
-                            <Badge>{order.paymentStatus}</Badge>
+                            <Badge variant={paymentVariant(order.paymentStatus)}>
+                                {paymentLabels[order.paymentStatus] || order.paymentStatus}
+                            </Badge>
                         </div>
                     </div>
 
@@ -108,6 +152,51 @@ export function OrderDetailsModal({ order, open, onOpenChange }: Props) {
                             ))}
                         </div>
                     </div>
+
+                    {/* CANCEL & REFUND */}
+                    {canRefund && (
+                        <>
+                            <Separator />
+                            <div className="space-y-2">
+                                {refundError && (
+                                    <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                                        {refundError}
+                                    </div>
+                                )}
+
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button
+                                            variant="destructive"
+                                            className="w-full"
+                                            disabled={refunding}
+                                        >
+                                            {refunding ? (
+                                                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing refund...</>
+                                            ) : (
+                                                "Cancel & Refund"
+                                            )}
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Cancel & refund this order?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                This will issue a full refund of {parseFloat(order.totalPrice).toFixed(2)} &euro; to the customer.
+                                                This action cannot be undone.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Keep order</AlertDialogCancel>
+                                            <AlertDialogAction onClick={handleRefund} disabled={refunding}>
+                                                {refunding ? "Processing..." : "Yes, refund"}
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </div>
+                        </>
+                    )}
 
                 </div>
             </DialogContent>
