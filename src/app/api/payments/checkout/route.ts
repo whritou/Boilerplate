@@ -7,6 +7,7 @@ import { withErrorHandler } from '@/middlewares/withErrorHandler'
 import { requireUser } from '@/lib/auth/requireAdmin'
 import { ForbiddenError } from '@/utils/errors'
 import { orderService } from '@/services/order.service'
+import { rateLimit } from '@/middlewares/rateLimit'
 
 const bodySchema = z.object({
     orderId: z.string().min(1),
@@ -14,7 +15,12 @@ const bodySchema = z.object({
     cancelUrl: z.string().url(),
 })
 
+const checkLimit = rateLimit({ windowMs: 60_000, max: 10 })
+
 export const POST = withErrorHandler(async (req: NextRequest) => {
+    const limited = checkLimit(req)
+    if (limited) return limited
+
     const session = await requireUser()
     if (!session) throw new ForbiddenError()
 

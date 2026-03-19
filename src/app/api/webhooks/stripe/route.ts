@@ -4,7 +4,10 @@ import { stripe } from '@/lib/stripe'
 import { paymentService } from '@/services/payment.service'
 import type { PaymentStatus } from '@prisma/client'
 
-const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET!
+const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET
+if (!WEBHOOK_SECRET) {
+    console.error('[Stripe Webhook] STRIPE_WEBHOOK_SECRET is not configured')
+}
 
 /**
  * Maps Stripe PaymentIntent statuses to our PaymentStatus enum.
@@ -27,14 +30,14 @@ export async function POST(req: NextRequest) {
     const body = await req.text()
     const signature = req.headers.get('stripe-signature')
 
-    if (!signature) {
+    if (!signature || !WEBHOOK_SECRET) {
         return NextResponse.json({ error: 'Missing stripe-signature' }, { status: 400 })
     }
 
     let event
 
     try {
-        event = stripe.webhooks.constructEvent(body, signature, WEBHOOK_SECRET)
+        event = stripe.webhooks.constructEvent(body, signature, WEBHOOK_SECRET!)
     } catch (err) {
         console.error('[Stripe Webhook] Signature verification failed:', err)
         return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
@@ -55,7 +58,11 @@ export async function POST(req: NextRequest) {
                 const status = mapStripeStatus(paymentIntent.status)
 
                 if (status) {
-                    await paymentService.handleStripeWebhook(paymentIntent.id, status)
+                    await paymentService.handleStripeWebhook(
+                        paymentIntent.id,
+                        status,
+                        paymentIntent.amount_received,
+                    )
                 }
                 break
             }

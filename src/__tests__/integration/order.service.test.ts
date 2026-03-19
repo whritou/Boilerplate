@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { BadRequestError, NotFoundError } from '@/utils/errors'
+import { BadRequestError, NotFoundError, ForbiddenError } from '@/utils/errors'
 
 vi.mock('@/lib/stripe', () => ({
     stripe: {
@@ -18,6 +18,7 @@ vi.mock('@/repositories/order.repository', () => ({
         findByStripePaymentIntentId: vi.fn(),
         findExpiredUnpaid: vi.fn(),
         createWithItems: vi.fn(),
+        update: vi.fn(),
         updateStatus: vi.fn(),
         updatePaymentStatus: vi.fn(),
     },
@@ -157,5 +158,46 @@ describe('OrderService.getById', () => {
         const result = await orderService.getById('ord-expired')
         expect(result.status).toBe('canceled')
         expect(mockProductRepo.incrementStock).toHaveBeenCalledWith('prod-1', 1)
+    })
+})
+
+describe('OrderService.updateShippingAddress', () => {
+    const validAddress = {
+        shippingFirstName: 'John',
+        shippingLastName: 'Doe',
+        shippingStreet: '123 Main St',
+        shippingCity: 'Paris',
+        shippingZipCode: '75001',
+        shippingCountry: 'France',
+    }
+
+    it('updates address on a pending order owned by user', async () => {
+        const order = { id: 'ord-1', userId: 'user-1', status: 'pending', paymentStatus: 'requires_payment_method' }
+        mockOrderRepo.findById.mockResolvedValue(order)
+        mockOrderRepo.update.mockResolvedValue({ ...order, ...validAddress })
+
+        const result = await orderService.updateShippingAddress('ord-1', 'user-1', validAddress)
+        expect(result!.shippingFirstName).toBe('John')
+        expect(mockOrderRepo.update).toHaveBeenCalledWith('ord-1', validAddress)
+    })
+
+    it('throws NotFoundError when order does not exist', async () => {
+        mockOrderRepo.findById.mockResolvedValue(null)
+        await expect(orderService.updateShippingAddress('missing', 'user-1', validAddress)).rejects.toThrow(NotFoundError)
+    })
+
+    it('throws ForbiddenError when user does not own the order', async () => {
+        mockOrderRepo.findById.mockResolvedValue({ id: 'ord-1', userId: 'user-2', status: 'pending', paymentStatus: 'requires_payment_method' })
+        await expect(orderService.updateShippingAddress('ord-1', 'user-1', validAddress)).rejects.toThrow(ForbiddenError)
+    })
+
+    it('throws BadRequestError when order is not pending', async () => {
+        mockOrderRepo.findById.mockResolvedValue({ id: 'ord-1', userId: 'user-1', status: 'confirmed', paymentStatus: 'succeeded' })
+        await expect(orderService.updateShippingAddress('ord-1', 'user-1', validAddress)).rejects.toThrow(BadRequestError)
+    })
+
+    it('throws BadRequestError when order is already paid', async () => {
+        mockOrderRepo.findById.mockResolvedValue({ id: 'ord-1', userId: 'user-1', status: 'pending', paymentStatus: 'succeeded' })
+        await expect(orderService.updateShippingAddress('ord-1', 'user-1', validAddress)).rejects.toThrow(BadRequestError)
     })
 })

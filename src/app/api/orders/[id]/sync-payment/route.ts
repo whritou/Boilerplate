@@ -7,8 +7,10 @@ import { ApiResponse } from '@/utils/apiResponse'
 import { withErrorHandler } from '@/middlewares/withErrorHandler'
 import { requireUser } from '@/lib/auth/requireAdmin'
 import { ForbiddenError } from '@/utils/errors'
+import { rateLimit } from '@/middlewares/rateLimit'
 
 const paramsSchema = z.object({ id: z.string().min(1) })
+const checkLimit = rateLimit({ windowMs: 60_000, max: 5 })
 
 /**
  * POST /api/orders/[id]/sync-payment
@@ -16,6 +18,9 @@ const paramsSchema = z.object({ id: z.string().min(1) })
  * Called after the user returns from Stripe payment confirmation.
  */
 export const POST = withErrorHandler(async (_req: NextRequest, context) => {
+    const limited = checkLimit(_req)
+    if (limited) return limited
+
     const session = await requireUser()
     if (!session) throw new ForbiddenError()
 

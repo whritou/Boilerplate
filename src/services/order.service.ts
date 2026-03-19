@@ -169,7 +169,8 @@ class OrderService {
         if (order.stripePaymentIntentId) {
             try {
                 await stripe.paymentIntents.cancel(order.stripePaymentIntentId)
-            } catch {
+            } catch (err) {
+                console.error(`[Order] Failed to cancel Stripe PaymentIntent:`, err)
             }
         }
 
@@ -202,7 +203,8 @@ class OrderService {
         if (order.stripePaymentIntentId) {
             try {
                 await stripe.paymentIntents.cancel(order.stripePaymentIntentId)
-            } catch {
+            } catch (err) {
+                console.error(`[Order] Failed to cancel Stripe PaymentIntent:`, err)
             }
         }
 

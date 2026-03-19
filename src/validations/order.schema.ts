@@ -36,13 +36,13 @@ export const orderParamsSchema = z.object({
 })
 
 export const shippingAddressSchema = z.object({
-    shippingFirstName: z.string().min(1, "First name is required"),
-    shippingLastName: z.string().min(1, "Last name is required"),
-    shippingStreet: z.string().min(1, "Street is required"),
-    shippingCity: z.string().min(1, "City is required"),
-    shippingZipCode: z.string().min(1, "Zip code is required"),
-    shippingCountry: z.string().min(1, "Country is required"),
-    shippingPhone: z.string().optional(),
+    shippingFirstName: z.string().trim().min(1, "First name is required").max(50),
+    shippingLastName: z.string().trim().min(1, "Last name is required").max(50),
+    shippingStreet: z.string().trim().min(1, "Street is required").max(200),
+    shippingCity: z.string().trim().min(1, "City is required").max(100),
+    shippingZipCode: z.string().trim().min(1, "Zip code is required").max(20),
+    shippingCountry: z.string().trim().min(1, "Country is required").max(100),
+    shippingPhone: z.string().trim().max(30).optional(),
 })
 
 export type OrderBase = z.infer<typeof orderBaseSchema>

@@ -54,12 +54,15 @@ class PaymentService {
 
         const amount = Math.round(order.totalPrice * 100)
 
-        const paymentIntent = await stripe.paymentIntents.create({
-            amount,
-            currency: 'eur',
-            metadata: { orderId: order.id },
-            automatic_payment_methods: { enabled: true },
-        })
+        const paymentIntent = await stripe.paymentIntents.create(
+            {
+                amount,
+                currency: 'eur',
+                metadata: { orderId: order.id },
+                automatic_payment_methods: { enabled: true },
+            },
+            { idempotencyKey: `create-pi-${order.id}` },
+        )
 
         await orderRepository.update(order.id, {
             stripePaymentIntentId: paymentIntent.id,
@@ -105,6 +108,13 @@ class PaymentService {
             return order
         }
 
+        // Check if webhook already processed this — avoid race condition
+        const existingPayment = await paymentRepository.findByStripePaymentIntentId(order.stripePaymentIntentId)
+
+        if (existingPayment && existingPayment.status === newStatus) {
+            return orderRepository.findWithDetails(orderId)
+        }
+
         await orderRepository.updatePaymentStatus(orderId, newStatus)
 
         if (newStatus === 'succeeded') {
@@ -113,8 +123,6 @@ class PaymentService {
         } else if (newStatus === 'canceled') {
             await orderRepository.updateStatus(orderId, 'canceled')
         }
-
-        const existingPayment = await paymentRepository.findByStripePaymentIntentId(order.stripePaymentIntentId)
 
         if (existingPayment) {
             await paymentRepository.updateStatus(existingPayment.id, newStatus)
@@ -232,11 +240,16 @@ class PaymentService {
 
     /**
      * Handles a Stripe webhook event for a payment intent.
+     * Verifies the paid amount matches the order total to prevent tampering.
+     * Skips duplicate events (idempotent).
      */
-    async handleStripeWebhook(stripePaymentIntentId: string, status: PaymentStatus) {
+    async handleStripeWebhook(stripePaymentIntentId: string, status: PaymentStatus, amountReceived?: number) {
         const existing = await paymentRepository.findByStripePaymentIntentId(stripePaymentIntentId)
 
         if (existing) {
+            if (existing.status === status) {
+                return existing
+            }
             return this.updateStatus(existing.id, status)
         }
 
@@ -244,6 +257,14 @@ class PaymentService {
 
         if (!order) {
             throw new NotFoundError('Order not found for payment intent')
+        }
+
+        if (status === 'succeeded' && amountReceived !== undefined) {
+            const expectedAmount = Math.round(order.totalPrice * 100)
+            if (amountReceived !== expectedAmount) {
+                console.error(`[Payment] Amount mismatch for order ${order.id}: expected ${expectedAmount}, got ${amountReceived}`)
+                throw new BadRequestError('Payment amount does not match order total')
+            }
         }
 
         return this.create({
