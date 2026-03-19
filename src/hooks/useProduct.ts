@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react"
 import { useProductStore } from "@/stores/product.store"
 import type { ProductEntity } from "@/types/models/product"
+import {useOrderStore} from "@/stores/order.store";
 
 type QueryParams = Record<string, string | number | boolean | undefined>
 
@@ -46,23 +47,23 @@ export const useProducts = (params: QueryParams = {}) => {
 
     const prevProductsRef = useRef(products)
     const prevMetaRef = useRef(currentMeta)
-    if (products.length > 0 || currentMeta) {
+    if (products.length > 0) {
         prevProductsRef.current = products
+    }
+
+    if (currentMeta) {
         prevMetaRef.current = currentMeta
     }
 
-    const hasDataForKey = !!pages[key]
-    const isFetching = !hasDataForKey && !error
+    const storeLoading = useProductStore((s) => s.loading)
+
+    const hasDataForKey = pages[key] !== undefined
 
     return {
-        products: products.length > 0 ? products : prevProductsRef.current,
-        meta: currentMeta ?? prevMetaRef.current,
-        loading: isFetching,
+        products: hasDataForKey ? products : prevProductsRef.current,
+        meta: hasDataForKey ? currentMeta : prevMetaRef.current,
+        loading: storeLoading && !hasDataForKey,
+        isFresh: hasDataForKey,
         error,
     }
-}
-
-export const useAllProducts = () => {
-    const entities = useProductStore((s) => s.entities)
-    return useMemo(() => Object.values(entities), [entities])
 }

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { mapOrder } from "@/lib/mappers/order.mapper"
 import {
     Dialog,
     DialogContent,
@@ -39,7 +40,8 @@ export function OrderDetailsModal({ order, open, onOpenChange, onRefunded }: Pro
     if (!order) return null
 
     const hasAddress = !!(order.shippingFirstName || order.shippingStreet)
-    const canRefund = order.status !== "canceled" && order.paymentStatus === "succeeded"
+    const canRefund = order.status !== "canceled" && order.paymentStatus === "succeeded" &&
+        order.status != "shipped" && order.status !== "delivered"
 
     const handleRefund = async () => {
         setRefunding(true)
@@ -54,7 +56,7 @@ export function OrderDetailsModal({ order, open, onOpenChange, onRefunded }: Pro
                 return
             }
 
-            onRefunded?.(json.data)
+            onRefunded?.(mapOrder(json.data))
             onOpenChange(false)
         } catch {
             setRefundError("Network error")

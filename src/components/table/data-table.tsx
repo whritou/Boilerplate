@@ -49,71 +49,77 @@ export function DataTable<T>({
                                  toolbar,
                                  footer,
                              }: DataTableProps<T>) {
+
+    const isEmpty = data.length === 0
+
     return (
         <div className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
 
+            {/* ✅ Toolbar ALWAYS visible */}
             {toolbar && (
                 <div className="border-b border-border">
                     {toolbar}
                 </div>
             )}
 
-            <div className="overflow-x-auto">
-                <Table>
+            {/* ✅ EMPTY MODE */}
+            {isEmpty ? (
+                <div className="flex items-center justify-center py-16">
+                    {empty ?? <TableEmpty />}
+                </div>
+            ) : (
+                <>
+                    <div className="overflow-x-auto">
+                        <Table>
 
-                    <TableHeader>
-                        <TableRow className="bg-muted/40">
-                            {columns.map((col) => (
-                                <TableHead
-                                    key={col.key}
-                                    className={cn(
-                                        "px-4 py-2.5 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground",
-                                        col.headerClassName
-                                    )}
-                                >
-                                    {col.header}
-                                </TableHead>
-                            ))}
-                        </TableRow>
-                    </TableHeader>
-
-                    <TableBody>
-                        {data.length === 0 ? (
-                            <TableRow>
-                                <TableCell colSpan={columns.length}>
-                                    {empty ?? <TableEmpty />}
-                                </TableCell>
-                            </TableRow>
-                        ) : (
-                            data.map((row) => (
-                                <TableRow
-                                    key={rowKey(row)}
-                                    onClick={() => onRowClick?.(row)}
-                                    className={cn(
-                                        "transition-colors",
-                                        onRowClick && "cursor-pointer hover:bg-muted/40"
-                                    )}
-                                >
+                            <TableHeader>
+                                <TableRow className="bg-muted/40">
                                     {columns.map((col) => (
-                                        <TableCell
+                                        <TableHead
                                             key={col.key}
-                                            className={cn("px-4 py-3 align-middle", col.className)}
+                                            className={cn(
+                                                "px-4 py-2.5 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground",
+                                                col.headerClassName
+                                            )}
                                         >
-                                            {col.render(row)}
-                                        </TableCell>
+                                            {col.header}
+                                        </TableHead>
                                     ))}
                                 </TableRow>
-                            ))
-                        )}
-                    </TableBody>
+                            </TableHeader>
 
-                </Table>
-            </div>
+                            <TableBody>
+                                {data.map((row) => (
+                                    <TableRow
+                                        key={rowKey(row)}
+                                        onClick={() => onRowClick?.(row)}
+                                        className={cn(
+                                            "transition-colors",
+                                            onRowClick && "cursor-pointer hover:bg-muted/40"
+                                        )}
+                                    >
+                                        {columns.map((col) => (
+                                            <TableCell
+                                                key={col.key}
+                                                className={cn("px-4 py-3 align-middle", col.className)}
+                                            >
+                                                {col.render(row)}
+                                            </TableCell>
+                                        ))}
+                                    </TableRow>
+                                ))}
+                            </TableBody>
 
-            {footer && (
-                <div className="border-t border-border bg-muted/30 px-4 py-3">
-                    {footer}
-                </div>
+                        </Table>
+                    </div>
+
+                    {/* ✅ Footer ONLY when data exists */}
+                    {footer && (
+                        <div className="border-t border-border bg-muted/30 px-4 py-3">
+                            {footer}
+                        </div>
+                    )}
+                </>
             )}
         </div>
     )

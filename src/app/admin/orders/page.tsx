@@ -31,7 +31,6 @@ export default function AdminOrdersPage() {
 
     const { orders, meta, loading, error } = useOrders(params)
     const storeError = useOrderStore((s) => s.error)
-    const invalidate = useOrderStore((s) => s.invalidate)
 
     const columns: Column<OrderEntity>[] = [
         {
@@ -103,7 +102,7 @@ export default function AdminOrdersPage() {
     )
 
     const isInitialLoad = loading && orders.length === 0
-    if (isInitialLoad || (error && orders.length === 0) || (!loading && orders.length === 0)) {
+    if (isInitialLoad || (error && orders.length === 0)) {
         return (
             <div>
                 <h1 className="text-2xl font-bold mb-6">Orders</h1>
@@ -130,6 +129,16 @@ export default function AdminOrdersPage() {
                     setSelectedOrder(row)
                     setOpen(true)
                 }}
+                empty={
+                    <DataState
+                        loading={loading}
+                        error={error || storeError}
+                        data={orders}
+                        loadingMessage="Loading orders..."
+                        errorMessage={error || storeError || undefined}
+                        emptyMessage="No order found"
+                    />
+                }
                 toolbar={
                     <TableToolbar count={meta?.total}>
                         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1) }} className="w-64" />
@@ -158,8 +167,10 @@ export default function AdminOrdersPage() {
                 order={selectedOrder}
                 open={open}
                 onOpenChange={setOpen}
-                onRefunded={() => {
-                    invalidate()
+                onRefunded={(updatedOrder) => {
+                    useOrderStore.setState((state) => ({
+                        entities: { ...state.entities, [updatedOrder.id]: updatedOrder },
+                    }))
                     setSelectedOrder(null)
                 }}
             />

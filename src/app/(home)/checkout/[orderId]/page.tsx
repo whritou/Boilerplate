@@ -31,7 +31,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
     const paymentReturnRef = useRef(false)
     const invalidate = useOrderStore((s) => s.invalidate)
 
-    // Address form state — kept in parent so prefill works correctly
     const [addressSaved, setAddressSaved] = useState(false)
     const [addressSaving, setAddressSaving] = useState(false)
     const [addressError, setAddressError] = useState<string | null>(null)
@@ -53,7 +52,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
         setters[field](value)
     }, [])
 
-    // Prefill address from order (if already saved) or from session user data
     const [prefilled, setPrefilled] = useState(false)
     useEffect(() => {
         if (prefilled) return
@@ -112,7 +110,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
         }
     }, [syncPayment])
 
-    // Only create payment intent after address is saved
     useEffect(() => {
         if (!order || order.paymentStatus === "succeeded" || order.status === "canceled" || syncing) return
         if (paymentReturnRef.current) return

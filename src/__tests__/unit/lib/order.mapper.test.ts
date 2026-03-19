@@ -122,3 +122,35 @@ describe('mapOrders', () => {
         expect(mapOrders([])).toEqual([])
     })
 })
+
+describe('mapOrder - edge cases', () => {
+    it('defaults items to [] when items is null', () => {
+        const dto = { ...sampleDTO, items: null as any }
+        const entity = mapOrder(dto)
+        expect(entity.items).toEqual([])
+    })
+
+    it('defaults items to [] when items is undefined', () => {
+        const dto = { ...sampleDTO, items: undefined as any }
+        const entity = mapOrder(dto)
+        expect(entity.items).toEqual([])
+    })
+
+    it('sets user to undefined when user field is not present', () => {
+        const { user, ...rest } = sampleDTO
+        const entity = mapOrder(rest as OrderDTO)
+        expect(entity.user).toBeUndefined()
+    })
+
+    it('converts stripePaymentIntentId null to undefined', () => {
+        const dto: OrderDTO = { ...sampleDTO, stripePaymentIntentId: null }
+        const entity = mapOrder(dto)
+        expect(entity.stripePaymentIntentId).toBeUndefined()
+    })
+
+    it('converts expiresAt null to undefined', () => {
+        const dto: OrderDTO = { ...sampleDTO, expiresAt: null }
+        const entity = mapOrder(dto)
+        expect(entity.expiresAt).toBeUndefined()
+    })
+})

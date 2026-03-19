@@ -5,7 +5,6 @@ import { paymentService } from '@/services/payment.service'
 import { orderRepository } from '@/repositories/order.repository'
 import type { PaymentStatus } from '@prisma/client'
 
-// Stripe signature verification requires Node.js crypto — must not run on Edge
 export const runtime = 'nodejs'
 
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET

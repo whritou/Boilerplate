@@ -7,34 +7,10 @@ import { useProduct } from "@/hooks/useProduct"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Skeleton } from "@/components/ui/skeleton"
 import { ArrowLeft, ShoppingCart, Minus, Plus, Check, PackageOpen, AlertCircle } from "lucide-react"
 import { useCartStore } from "@/stores/cart.store"
-
-function ProductDetailSkeleton() {
-    return (
-        <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
-            <Skeleton className="aspect-square w-full rounded-xl" />
-            <div className="space-y-6">
-                <div className="space-y-3">
-                    <Skeleton className="h-8 w-3/4" />
-                    <Skeleton className="h-9 w-32" />
-                </div>
-                <Skeleton className="h-5 w-24 rounded-full" />
-                <div className="space-y-2">
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-2/3" />
-                </div>
-                <Separator />
-                <div className="space-y-4">
-                    <Skeleton className="h-10 w-36" />
-                    <Skeleton className="h-11 w-48" />
-                </div>
-            </div>
-        </div>
-    )
-}
+import { ProductDetailSkeleton } from "@/components/products/ProductDetailSkeleton"
+import { signIn } from "next-auth/react"
 
 export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params)

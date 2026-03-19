@@ -130,7 +130,7 @@ export default function AdminProductsPage() {
                              emptyMessage="No product found" />
 
     const isInitialLoad = loading && products.length === 0
-    if (isInitialLoad || (error && products.length === 0) || (!loading && products.length === 0)) {
+    if (isInitialLoad || (error && products.length === 0)) {
         return (
             <div>
                 <div className="mb-6 flex items-center justify-between">
@@ -162,6 +162,16 @@ export default function AdminProductsPage() {
                 columns={columns}
                 data={products}
                 rowKey={(row) => row.id}
+                empty={
+                    <DataState
+                        loading={loading}
+                        error={error || storeError}
+                        data={products}
+                        loadingMessage="Loading products..."
+                        errorMessage={error || storeError || undefined}
+                        emptyMessage="No product found"
+                    />
+                }
                 toolbar={
                     <TableToolbar count={meta?.total}>
                         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1) }} className="w-64" />

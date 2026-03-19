@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { fetchWithAuth } from '@/lib/api/fetchWithAuth'
 
 type QueryParams = Record<
     string,
@@ -54,25 +55,45 @@ const GENERIC_ERROR_NAMES = new Set([
     'Internal Server Error', 'Validation failed',
 ])
 
+/**
+ * Extracts a meaningful error message from an API response.
+ * Falls back to predefined HTTP messages when the API message is generic or missing.
+ */
 async function extractError(res: Response): Promise<string> {
     const fallback = HTTP_ERROR_MESSAGES[res.status] || `Erreur (${res.status})`
+
     try {
         const json = await res.json()
         const apiMessage = json?.error?.message
+
         if (!apiMessage || GENERIC_ERROR_NAMES.has(apiMessage)) {
             return fallback
         }
+
         return apiMessage
     } catch {
         return fallback
     }
 }
 
+/**
+ * Factory to create a reusable CRUD Zustand store.
+ *
+ * Features:
+ * - Normalized entity storage
+ * - Query-based pagination cache
+ * - Request deduplication
+ * - Stale-while-revalidate caching (STALE_MS)
+ * - Optimistic updates (create, update, delete)
+ * - Centralized error handling
+ */
 export function createCrudStore<T extends Identifiable>(
     apiPath: string,
     mapOne: (data: any) => T,
     mapMany: (data: any[]) => T[]
 ) {
+    const fetchingKeys = new Set<string>()
+
     return create<CrudState<T>>((set, get) => ({
         entities: {},
         pages: {},
@@ -83,12 +104,21 @@ export function createCrudStore<T extends Identifiable>(
 
         lastFetch: {},
 
+        /**
+         * Fetch a list of entities with optional query params.
+         *
+         * - Uses cache with TTL (STALE_MS)
+         * - Prevents duplicate concurrent requests
+         * - Stores normalized entities + page mapping
+         */
         async fetchMany(params = {}) {
             const key = JSON.stringify(params)
             const last = get().lastFetch[key]
 
             if (last && Date.now() - last < STALE_MS) return
+            if (fetchingKeys.has(key)) return
 
+            fetchingKeys.add(key)
             set({ loading: true, error: null })
 
             try {
@@ -104,7 +134,7 @@ export function createCrudStore<T extends Identifiable>(
                     }
                 }
 
-                const res = await fetch(`/api/${apiPath}?${qs.toString()}`)
+                const res = await fetchWithAuth(`/api/${apiPath}?${qs.toString()}`)
 
                 if (!res.ok) {
                     const msg = await extractError(res)
@@ -135,9 +165,17 @@ export function createCrudStore<T extends Identifiable>(
                 })
             } catch {
                 set({ loading: false, error: 'Network error' })
+            } finally {
+                fetchingKeys.delete(key)
             }
         },
 
+        /**
+         * Fetch a single entity by ID.
+         *
+         * - Skips request if already cached unless `force` is true
+         * - Updates normalized entity store
+         */
         async fetchOne(id, force) {
             if (!force && get().entities[id]) return
 
@@ -166,6 +204,13 @@ export function createCrudStore<T extends Identifiable>(
             }
         },
 
+        /**
+         * Create a new entity with optimistic update.
+         *
+         * - Inserts temporary entity
+         * - Replaces it with server response
+         * - Rolls back on failure
+         */
         async createOne(data) {
             const tmpId = `tmp-${Date.now()}`
             const optimistic: T = { id: tmpId, ...data } as T
@@ -184,11 +229,13 @@ export function createCrudStore<T extends Identifiable>(
 
                 if (!res.ok) {
                     const msg = await extractError(res)
+
                     set((state) => {
                         const entities = { ...state.entities }
                         delete entities[tmpId]
                         return { entities, error: msg }
                     })
+
                     return null
                 }
 
@@ -213,6 +260,13 @@ export function createCrudStore<T extends Identifiable>(
             }
         },
 
+        /**
+         * Update an entity with optimistic update.
+         *
+         * - Applies local update immediately
+         * - Syncs with server response
+         * - Rolls back on failure
+         */
         async updateOne(id, data) {
             const previous = get().entities[id]
             if (!previous) return null
@@ -231,6 +285,7 @@ export function createCrudStore<T extends Identifiable>(
 
                 if (!res.ok) {
                     const msg = await extractError(res)
+
                     set((state) => ({
                         entities: { ...state.entities, [id]: previous },
                         error: msg,
@@ -256,6 +311,12 @@ export function createCrudStore<T extends Identifiable>(
             }
         },
 
+        /**
+         * Delete an entity with optimistic removal.
+         *
+         * - Removes entity from store and all cached pages
+         * - Restores it if request fails
+         */
         async deleteOne(id) {
             const previous = get().entities[id]
             if (!previous) return false
@@ -263,12 +324,14 @@ export function createCrudStore<T extends Identifiable>(
             set((state) => {
                 const entities = { ...state.entities }
                 delete entities[id]
+
                 const pages = Object.fromEntries(
                     Object.entries(state.pages).map(([k, ids]) => [
                         k,
                         ids.filter((i) => i !== id),
                     ])
                 )
+
                 return { entities, pages, error: null }
             })
 
@@ -277,6 +340,7 @@ export function createCrudStore<T extends Identifiable>(
 
                 if (!res.ok) {
                     const msg = await extractError(res)
+
                     set((state) => ({
                         entities: { ...state.entities, [id]: previous },
                         error: msg,
@@ -294,10 +358,17 @@ export function createCrudStore<T extends Identifiable>(
             }
         },
 
+        /**
+         * Clears the current error state.
+         */
         clearError() {
             set({ error: null })
         },
 
+        /**
+         * Invalidates all cached queries.
+         * Forces future fetches to reload data.
+         */
         invalidate() {
             set({
                 pages: {},

@@ -10,14 +10,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="min-h-screen bg-background">
             <header className="border-b border-border bg-card">
                 <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-4">
-                    <Link href="/" className="text-sm font-semibold text-foreground hover:text-foreground/80">
-                        Accueil
+                    <Link href="/products" className="text-sm font-semibold text-foreground hover:text-foreground/80">
+                        Home
                     </Link>
                     <Link href="/admin/products" className="text-sm text-muted-foreground hover:text-foreground">
-                        Produits
+                        Products
                     </Link>
                     <Link href="/admin/orders" className="text-sm text-muted-foreground hover:text-foreground">
-                        Commandes
+                        Orders
                     </Link>
                     <span className="ml-auto text-xs text-muted-foreground">
                         Admin — {session.user.email}

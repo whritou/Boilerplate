@@ -135,6 +135,24 @@ describe('OrderService.createFromCart', () => {
         mockProductRepo.findById.mockResolvedValue({ ...sampleProduct, quantity: 1 })
         await expect(orderService.createFromCart('user-1')).rejects.toThrow(BadRequestError)
     })
+
+    it('throws NotFoundError when product is not found', async () => {
+        mockCartRepo.findByUserId.mockResolvedValue(sampleCart)
+        mockProductRepo.findById.mockResolvedValue(null)
+        await expect(orderService.createFromCart('user-1')).rejects.toThrow(NotFoundError)
+    })
+
+    it('throws BadRequestError when product is archived', async () => {
+        mockCartRepo.findByUserId.mockResolvedValue(sampleCart)
+        mockProductRepo.findById.mockResolvedValue({ ...sampleProduct, isArchived: true })
+        await expect(orderService.createFromCart('user-1')).rejects.toThrow(BadRequestError)
+    })
+
+    it('throws BadRequestError when product is soft-deleted', async () => {
+        mockCartRepo.findByUserId.mockResolvedValue(sampleCart)
+        mockProductRepo.findById.mockResolvedValue({ ...sampleProduct, deletedAt: new Date() })
+        await expect(orderService.createFromCart('user-1')).rejects.toThrow(BadRequestError)
+    })
 })
 
 describe('OrderService.cancel', () => {
@@ -163,6 +181,41 @@ describe('OrderService.cancel', () => {
     it('throws NotFoundError when order not found', async () => {
         mockOrderRepo.findWithDetails.mockResolvedValue(null)
         await expect(orderService.cancel('missing')).rejects.toThrow(NotFoundError)
+    })
+})
+
+describe('OrderService.getById - basic paths', () => {
+    it('throws NotFoundError when order does not exist', async () => {
+        mockOrderRepo.findWithDetails.mockResolvedValue(null)
+        await expect(orderService.getById('missing')).rejects.toThrow(NotFoundError)
+    })
+
+    it('returns order directly when not expired', async () => {
+        const order = {
+            id: 'ord-1',
+            status: 'confirmed',
+            paymentStatus: 'succeeded',
+            expiresAt: new Date(Date.now() + 60000),
+            items: [],
+        }
+        mockOrderRepo.findWithDetails.mockResolvedValue(order)
+
+        const result = await orderService.getById('ord-1')
+        expect(result).toBe(order)
+    })
+
+    it('returns order directly when expiresAt is null (no expiry)', async () => {
+        const order = {
+            id: 'ord-1',
+            status: 'pending',
+            paymentStatus: 'requires_payment_method',
+            expiresAt: null,
+            items: [],
+        }
+        mockOrderRepo.findWithDetails.mockResolvedValue(order)
+
+        const result = await orderService.getById('ord-1')
+        expect(result).toBe(order)
     })
 })
 
@@ -204,11 +257,22 @@ describe('OrderService.updateShippingAddress', () => {
     }
 
     it('updates address on a pending order owned by user', async () => {
-        const order = { id: 'ord-1', userId: 'user-1', status: 'pending', paymentStatus: 'requires_payment_method' }
+        const order = {
+            id: 'ord-1',
+            userId: 'user-1',
+            status: 'pending',
+            paymentStatus: 'requires_payment_method',
+        }
+
         mockOrderRepo.findById.mockResolvedValue(order)
         mockOrderRepo.update.mockResolvedValue({ ...order, ...validAddress })
+        mockOrderRepo.findWithDetails.mockResolvedValue({
+            ...order,
+            ...validAddress,
+        })
 
         const result = await orderService.updateShippingAddress('ord-1', 'user-1', validAddress)
+
         expect(result!.shippingFirstName).toBe('John')
         expect(mockOrderRepo.update).toHaveBeenCalledWith('ord-1', validAddress)
     })
@@ -231,6 +295,218 @@ describe('OrderService.updateShippingAddress', () => {
     it('throws BadRequestError when order is already paid', async () => {
         mockOrderRepo.findById.mockResolvedValue({ id: 'ord-1', userId: 'user-1', status: 'pending', paymentStatus: 'succeeded' })
         await expect(orderService.updateShippingAddress('ord-1', 'user-1', validAddress)).rejects.toThrow(BadRequestError)
+    })
+})
+
+describe('OrderService.getAll', () => {
+    it('delegates to orderRepository.findMany', async () => {
+        const paginated = { data: [], meta: { total: 0, page: 1, limit: 20, totalPages: 0, hasNextPage: false, hasPreviousPage: false } }
+        mockOrderRepo.findMany.mockResolvedValue(paginated)
+
+        const result = await orderService.getAll({})
+        expect(mockOrderRepo.findMany).toHaveBeenCalledWith({})
+        expect(result).toBe(paginated)
+    })
+})
+
+describe('OrderService.getByUserId', () => {
+    it('delegates to orderRepository.findByUserId', async () => {
+        const orders = [{ id: 'ord-1' }]
+        mockOrderRepo.findByUserId.mockResolvedValue(orders)
+
+        const result = await orderService.getByUserId('user-1')
+        expect(mockOrderRepo.findByUserId).toHaveBeenCalledWith('user-1')
+        expect(result).toBe(orders)
+    })
+})
+
+describe('OrderService.updateStatus', () => {
+    it('calls orderRepository.updateStatus and returns order', async () => {
+        const updated = { id: 'ord-1', status: 'confirmed' }
+        mockOrderRepo.updateStatus.mockResolvedValue(updated)
+
+        const result = await orderService.updateStatus('ord-1', 'confirmed')
+        expect(mockOrderRepo.updateStatus).toHaveBeenCalledWith('ord-1', 'confirmed')
+        expect(result).toBe(updated)
+    })
+
+    it('throws NotFoundError when order not found', async () => {
+        mockOrderRepo.updateStatus.mockResolvedValue(null)
+        await expect(orderService.updateStatus('missing', 'confirmed')).rejects.toThrow(NotFoundError)
+    })
+})
+
+describe('OrderService.updatePaymentStatus', () => {
+    it('calls orderRepository.updatePaymentStatus and returns order', async () => {
+        const updated = { id: 'ord-1', paymentStatus: 'succeeded' }
+        mockOrderRepo.updatePaymentStatus.mockResolvedValue(updated)
+
+        const result = await orderService.updatePaymentStatus('ord-1', 'succeeded')
+        expect(mockOrderRepo.updatePaymentStatus).toHaveBeenCalledWith('ord-1', 'succeeded')
+        expect(result).toBe(updated)
+    })
+
+    it('throws NotFoundError when order not found', async () => {
+        mockOrderRepo.updatePaymentStatus.mockResolvedValue(null)
+        await expect(orderService.updatePaymentStatus('missing', 'succeeded')).rejects.toThrow(NotFoundError)
+    })
+})
+
+describe('OrderService.cancel - with Stripe PI', () => {
+    const orderWithPI = {
+        id: 'ord-1',
+        status: 'pending',
+        stripePaymentIntentId: 'pi_abc123',
+        items: [{ productId: 'prod-1', quantity: 1 }],
+    }
+
+    it('cancels stripe payment intent when order has one', async () => {
+        mockOrderRepo.findWithDetails.mockResolvedValue(orderWithPI)
+        mockProductRepo.incrementStock.mockResolvedValue({})
+        mockStripe.paymentIntents.cancel.mockResolvedValue({})
+        mockOrderRepo.updatePaymentStatus.mockResolvedValue({})
+        mockOrderRepo.updateStatus.mockResolvedValue({ ...orderWithPI, status: 'canceled' })
+
+        await orderService.cancel('ord-1')
+
+        expect(mockStripe.paymentIntents.cancel).toHaveBeenCalledWith('pi_abc123')
+    })
+
+    it('continues when stripe cancel throws (logs error)', async () => {
+        mockOrderRepo.findWithDetails.mockResolvedValue(orderWithPI)
+        mockProductRepo.incrementStock.mockResolvedValue({})
+        mockStripe.paymentIntents.cancel.mockRejectedValue(new Error('already canceled'))
+        mockOrderRepo.updatePaymentStatus.mockResolvedValue({})
+        mockOrderRepo.updateStatus.mockResolvedValue({ ...orderWithPI, status: 'canceled' })
+
+        // Should not throw even though Stripe errors
+        const result = await orderService.cancel('ord-1')
+        expect(result.status).toBe('canceled')
+    })
+})
+
+describe('OrderService.cancelExpired', () => {
+    it('does nothing when order not found (returns early)', async () => {
+        mockOrderRepo.findWithDetails.mockResolvedValue(null)
+
+        await orderService.cancelExpired('missing')
+
+        expect(mockProductRepo.incrementStock).not.toHaveBeenCalled()
+        expect(mockOrderRepo.updateStatus).not.toHaveBeenCalled()
+    })
+
+    it('does nothing when order is not pending', async () => {
+        mockOrderRepo.findWithDetails.mockResolvedValue({
+            id: 'ord-1',
+            status: 'confirmed',
+            paymentStatus: 'succeeded',
+            stripePaymentIntentId: null,
+            items: [],
+        })
+
+        await orderService.cancelExpired('ord-1')
+
+        expect(mockProductRepo.incrementStock).not.toHaveBeenCalled()
+        expect(mockOrderRepo.updateStatus).not.toHaveBeenCalled()
+    })
+
+    it('does nothing when order is succeeded', async () => {
+        mockOrderRepo.findWithDetails.mockResolvedValue({
+            id: 'ord-1',
+            status: 'pending',
+            paymentStatus: 'succeeded',
+            stripePaymentIntentId: null,
+            items: [],
+        })
+
+        await orderService.cancelExpired('ord-1')
+
+        expect(mockProductRepo.incrementStock).not.toHaveBeenCalled()
+        expect(mockOrderRepo.updateStatus).not.toHaveBeenCalled()
+    })
+
+    it('cancels stripe PI when present and handles error gracefully', async () => {
+        mockOrderRepo.findWithDetails.mockResolvedValue({
+            id: 'ord-1',
+            status: 'pending',
+            paymentStatus: 'requires_payment_method',
+            stripePaymentIntentId: 'pi_xyz',
+            items: [{ productId: 'prod-1', quantity: 2 }],
+        })
+        mockStripe.paymentIntents.cancel.mockRejectedValue(new Error('stripe error'))
+        mockProductRepo.incrementStock.mockResolvedValue({})
+        mockOrderRepo.updateStatus.mockResolvedValue({})
+        mockOrderRepo.updatePaymentStatus.mockResolvedValue({})
+
+        // Should not throw
+        await orderService.cancelExpired('ord-1')
+
+        expect(mockStripe.paymentIntents.cancel).toHaveBeenCalledWith('pi_xyz')
+        expect(mockProductRepo.incrementStock).toHaveBeenCalledWith('prod-1', 2)
+    })
+
+    it('restores stock and updates statuses', async () => {
+        mockOrderRepo.findWithDetails.mockResolvedValue({
+            id: 'ord-1',
+            status: 'pending',
+            paymentStatus: 'requires_payment_method',
+            stripePaymentIntentId: null,
+            items: [
+                { productId: 'prod-1', quantity: 3 },
+                { productId: 'prod-2', quantity: 1 },
+            ],
+        })
+        mockProductRepo.incrementStock.mockResolvedValue({})
+        mockOrderRepo.updateStatus.mockResolvedValue({})
+        mockOrderRepo.updatePaymentStatus.mockResolvedValue({})
+
+        await orderService.cancelExpired('ord-1')
+
+        expect(mockProductRepo.incrementStock).toHaveBeenCalledWith('prod-1', 3)
+        expect(mockProductRepo.incrementStock).toHaveBeenCalledWith('prod-2', 1)
+        expect(mockOrderRepo.updateStatus).toHaveBeenCalledWith('ord-1', 'canceled')
+        expect(mockOrderRepo.updatePaymentStatus).toHaveBeenCalledWith('ord-1', 'canceled')
+    })
+})
+
+describe('OrderService.cancelAllExpired', () => {
+    it('finds and cancels all expired orders', async () => {
+        const expiredOrders = [
+            { id: 'ord-1', status: 'pending', paymentStatus: 'requires_payment_method', stripePaymentIntentId: null, items: [] },
+            { id: 'ord-2', status: 'pending', paymentStatus: 'requires_payment_method', stripePaymentIntentId: null, items: [] },
+        ]
+        mockOrderRepo.findExpiredUnpaid.mockResolvedValue(expiredOrders)
+        mockOrderRepo.findWithDetails
+            .mockResolvedValueOnce(expiredOrders[0])
+            .mockResolvedValueOnce(expiredOrders[1])
+        mockProductRepo.incrementStock.mockResolvedValue({})
+        mockOrderRepo.updateStatus.mockResolvedValue({})
+        mockOrderRepo.updatePaymentStatus.mockResolvedValue({})
+
+        await orderService.cancelAllExpired()
+
+        expect(mockOrderRepo.findExpiredUnpaid).toHaveBeenCalled()
+        expect(mockOrderRepo.updateStatus).toHaveBeenCalledTimes(2)
+    })
+
+    it('returns count of canceled orders', async () => {
+        const expiredOrders = [
+            { id: 'ord-1', status: 'pending', paymentStatus: 'requires_payment_method', stripePaymentIntentId: null, items: [] },
+            { id: 'ord-2', status: 'pending', paymentStatus: 'requires_payment_method', stripePaymentIntentId: null, items: [] },
+            { id: 'ord-3', status: 'pending', paymentStatus: 'requires_payment_method', stripePaymentIntentId: null, items: [] },
+        ]
+        mockOrderRepo.findExpiredUnpaid.mockResolvedValue(expiredOrders)
+        mockOrderRepo.findWithDetails
+            .mockResolvedValueOnce(expiredOrders[0])
+            .mockResolvedValueOnce(expiredOrders[1])
+            .mockResolvedValueOnce(expiredOrders[2])
+        mockProductRepo.incrementStock.mockResolvedValue({})
+        mockOrderRepo.updateStatus.mockResolvedValue({})
+        mockOrderRepo.updatePaymentStatus.mockResolvedValue({})
+
+        const count = await orderService.cancelAllExpired()
+
+        expect(count).toBe(3)
     })
 })
 
@@ -288,6 +564,11 @@ describe('OrderService.cancelAndRefund', () => {
         await expect(orderService.cancelAndRefund('ord-1')).rejects.toThrow(BadRequestError)
     })
 
+    it('throws BadRequestError when order has no stripePaymentIntentId', async () => {
+        mockOrderRepo.findWithDetails.mockResolvedValue({ ...paidOrder, stripePaymentIntentId: null })
+        await expect(orderService.cancelAndRefund('ord-1')).rejects.toThrow(BadRequestError)
+    })
+
     it('throws BadRequestError when partial refund exists on Stripe', async () => {
         mockOrderRepo.findWithDetails.mockResolvedValue(paidOrder)
         mockStripe.refunds.list.mockResolvedValue({ data: [{ id: 're_partial' }] })
@@ -317,5 +598,20 @@ describe('OrderService.cancelAndRefund', () => {
 
         const result = await orderService.cancelAndRefund('ord-1')
         expect(result!.status).toBe('canceled')
+    })
+
+    it('skips email when user has no email address', async () => {
+        mockOrderRepo.findWithDetails
+            .mockResolvedValueOnce(paidOrder)
+            .mockResolvedValueOnce({ ...paidOrder, status: 'canceled', paymentStatus: 'refunded' })
+        mockStripe.refunds.list.mockResolvedValue({ data: [] })
+        mockStripe.refunds.create.mockResolvedValue({ id: 're_123' })
+        mockPrisma.$transaction.mockResolvedValue([{}, {}])
+        mockProductRepo.incrementStock.mockResolvedValue({})
+        mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-1', email: null })
+
+        const result = await orderService.cancelAndRefund('ord-1')
+        expect(result!.status).toBe('canceled')
+        expect(mockMail.sendOrderRefundEmail).not.toHaveBeenCalled()
     })
 })

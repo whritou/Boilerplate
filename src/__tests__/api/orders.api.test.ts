@@ -51,6 +51,18 @@ describe('GET /api/orders', () => {
         expect(json.success).toBe(true)
         expect(json.data).toHaveLength(1)
     })
+
+    it('non-admin user only sees their own orders (extraWhere set)', async () => {
+        mockAuth.mockResolvedValue({ user: { id: 'user-42', role: 'USER' } })
+
+        mockService.getAll.mockResolvedValue({ data: [], meta: { total: 0 } })
+
+        const req = new NextRequest(new URL('http://localhost:3000/api/orders'))
+        await GET(req, { params: Promise.resolve({}) })
+
+        const callArgs = mockService.getAll.mock.calls[0][0]
+        expect(callArgs.extraWhere).toEqual({ userId: 'user-42' })
+    })
 })
 
 describe('POST /api/orders', () => {

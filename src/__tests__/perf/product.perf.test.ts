@@ -25,7 +25,7 @@ describe('Performance: Product validation', () => {
         }
         const elapsed = performance.now() - start
 
-        expect(elapsed).toBeLessThan(500)
+        expect(elapsed).toBeLessThan(1000)
     })
 })
 

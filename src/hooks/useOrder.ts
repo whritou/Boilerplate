@@ -46,21 +46,25 @@ export const useOrders = (params: QueryParams = {}) => {
 
     const currentMeta = meta[key]
 
-    // Keep previous results visible while loading new query
     const prevOrdersRef = useRef(orders)
     const prevMetaRef = useRef(currentMeta)
-    if (orders.length > 0 || currentMeta) {
+
+    if (orders.length > 0) {
         prevOrdersRef.current = orders
+    }
+    if (currentMeta) {
         prevMetaRef.current = currentMeta
     }
 
-    const hasDataForKey = !!pages[key]
-    const isFetching = !hasDataForKey && !error
+    const storeLoading = useOrderStore((s) => s.loading)
+
+    const hasDataForKey = pages[key] !== undefined
 
     return {
-        orders: orders.length > 0 ? orders : prevOrdersRef.current,
-        meta: currentMeta ?? prevMetaRef.current,
-        loading: isFetching,
+        orders: hasDataForKey ? orders : prevOrdersRef.current,
+        meta: hasDataForKey ? currentMeta : prevMetaRef.current,
+        loading: storeLoading && !hasDataForKey,
+        isFresh: hasDataForKey,
         error,
     }
 }

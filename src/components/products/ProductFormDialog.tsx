@@ -120,7 +120,7 @@ export function ProductFormDialog({ open, onOpenChange, product }: Props) {
         setSubmitting(false)
 
         if (result) {
-            invalidate()
+            if (!isEdit) invalidate()
             onOpenChange(false)
         }
     }

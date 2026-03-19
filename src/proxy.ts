@@ -5,7 +5,9 @@ export async function proxy(req: NextRequest) {
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
     if (!token) {
-        return NextResponse.redirect(new URL("/signin", req.url));
+        const loginUrl = new URL("/signin", req.url);
+        loginUrl.searchParams.set("callbackUrl", req.nextUrl.pathname);
+        return NextResponse.redirect(loginUrl);
     }
 
     if (req.nextUrl.pathname.startsWith("/admin") && token.role !== "ADMIN") {
@@ -15,7 +17,6 @@ export async function proxy(req: NextRequest) {
     if (req.nextUrl.pathname.startsWith("/user") && token.role !== "USER") {
         return NextResponse.redirect(new URL("/unauthorized", req.url));
     }
-
 
     return NextResponse.next();
 }

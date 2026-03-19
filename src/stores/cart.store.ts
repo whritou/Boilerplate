@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { mapCart } from '@/lib/mappers/cart.mapper'
 import type { CartEntity } from '@/types/models/cart'
+import { fetchWithAuth } from '@/lib/api/fetchWithAuth'
 
 interface CartState {
     cart: CartEntity | null
@@ -71,7 +72,7 @@ export const useCartStore = create<CartState>((set, get) => ({
         set({ error: null })
 
         try {
-            const res = await fetch('/api/cart/items', {
+            const res = await fetchWithAuth('/api/cart/items', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ productId, quantity }),

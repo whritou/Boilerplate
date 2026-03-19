@@ -117,7 +117,8 @@ class OrderService {
             throw new BadRequestError('Order is already paid')
         }
 
-        return orderRepository.update(id, data as any)
+        await orderRepository.update(id, data as any)
+        return orderRepository.findWithDetails(id)
     }
 
     async updateStatus(id: string, status: OrderStatus) {

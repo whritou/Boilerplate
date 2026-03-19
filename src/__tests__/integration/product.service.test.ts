@@ -96,6 +96,17 @@ describe('ProductService.delete', () => {
     })
 })
 
+describe('ProductService.getAll', () => {
+    it('delegates to productRepository.findMany', async () => {
+        const paginated = { data: [sampleProduct], meta: { total: 1, page: 1, limit: 20 } }
+        mockRepo.findMany.mockResolvedValue(paginated)
+
+        const result = await productService.getAll({})
+        expect(mockRepo.findMany).toHaveBeenCalledWith({})
+        expect(result).toBe(paginated)
+    })
+})
+
 describe('ProductService.decrementStock', () => {
     it('decrements stock', async () => {
         const decremented = { ...sampleProduct, quantity: 5 }
@@ -103,5 +114,10 @@ describe('ProductService.decrementStock', () => {
 
         const result = await productService.decrementStock('prod-1', 5)
         expect(result.quantity).toBe(5)
+    })
+
+    it('throws NotFoundError when product not found', async () => {
+        mockRepo.decrementStock.mockResolvedValue(null)
+        await expect(productService.decrementStock('missing', 1)).rejects.toThrow(NotFoundError)
     })
 })

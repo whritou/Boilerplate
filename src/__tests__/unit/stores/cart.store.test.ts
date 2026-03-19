@@ -124,4 +124,121 @@ describe('useCartStore', () => {
         useCartStore.getState().clearError()
         expect(useCartStore.getState().error).toBeNull()
     })
+
+    it('addItem returns null and sets Network error on network failure', async () => {
+        vi.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('fetch failed'))
+
+        const result = await useCartStore.getState().addItem('prod-1', 1)
+
+        expect(result).toBeNull()
+        expect(useCartStore.getState().error).toBe('Network error')
+    })
+
+    it('updateItem returns updated cart on success', async () => {
+        const updatedCart = { ...mockCartDTO, items: [{ id: 'item-1', productId: 'prod-1', quantity: 5, price: '10.00' }] }
+
+        vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({ success: true, data: updatedCart }),
+        } as Response)
+
+        const result = await useCartStore.getState().updateItem('item-1', 5)
+
+        expect(result).not.toBeNull()
+        expect(result?.items[0].quantity).toBe(5)
+    })
+
+    it('updateItem returns null and sets error on HTTP failure', async () => {
+        vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+            ok: false,
+            status: 400,
+            json: async () => ({ success: false, error: { message: 'Insufficient stock' } }),
+        } as Response)
+
+        const result = await useCartStore.getState().updateItem('item-1', 999)
+
+        expect(result).toBeNull()
+        expect(useCartStore.getState().error).toBe('Insufficient stock')
+    })
+
+    it('updateItem returns null and sets Network error on network failure', async () => {
+        vi.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('fetch failed'))
+
+        const result = await useCartStore.getState().updateItem('item-1', 2)
+
+        expect(result).toBeNull()
+        expect(useCartStore.getState().error).toBe('Network error')
+    })
+
+    it('removeItem returns null and sets error on HTTP failure', async () => {
+        vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+            ok: false,
+            status: 404,
+            json: async () => ({ success: false, error: { message: 'Item not found' } }),
+        } as Response)
+
+        const result = await useCartStore.getState().removeItem('item-1')
+
+        expect(result).toBeNull()
+        expect(useCartStore.getState().error).toBe('Item not found')
+    })
+
+    it('removeItem returns null and sets Network error on network failure', async () => {
+        vi.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('fetch failed'))
+
+        const result = await useCartStore.getState().removeItem('item-1')
+
+        expect(result).toBeNull()
+        expect(useCartStore.getState().error).toBe('Network error')
+    })
+
+    it('clearCart returns cart on success', async () => {
+        const emptyCart = { ...mockCartDTO, items: [] }
+
+        vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({ success: true, data: emptyCart }),
+        } as Response)
+
+        const result = await useCartStore.getState().clearCart()
+
+        expect(result).not.toBeNull()
+        expect(result?.items).toHaveLength(0)
+    })
+
+    it('clearCart returns null and sets error on HTTP failure', async () => {
+        vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+            ok: false,
+            status: 500,
+            json: async () => ({ success: false, error: {} }),
+        } as Response)
+
+        const result = await useCartStore.getState().clearCart()
+
+        expect(result).toBeNull()
+        expect(useCartStore.getState().error).toBe('Server error, try again')
+    })
+
+    it('clearCart returns null and sets Network error on network failure', async () => {
+        vi.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('fetch failed'))
+
+        const result = await useCartStore.getState().clearCart()
+
+        expect(result).toBeNull()
+        expect(useCartStore.getState().error).toBe('Network error')
+    })
+
+    it('extractError falls back to HTTP status message when res.json() throws', async () => {
+        // Simulate a response whose json() method rejects (malformed body)
+        vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+            ok: false,
+            status: 500,
+            json: async () => { throw new SyntaxError('unexpected token') },
+        } as unknown as Response)
+
+        await useCartStore.getState().fetchCart()
+
+        // Should fall back to the HTTP_ERROR_MESSAGES[500] fallback
+        expect(useCartStore.getState().error).toBe('Server error, try again')
+    })
 })
