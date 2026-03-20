@@ -65,7 +65,7 @@ const sampleOrder = {
     shippingCity: 'Paris',
     shippingZipCode: '75001',
     shippingCountry: 'France',
-    expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+    expiresAt: new Date(Date.now() + 15 * 60 * 1000),
     items: [
         { productId: 'prod-1', quantity: 2, price: 14.995, product: { name: 'Widget', imageUrl: null } },
     ],

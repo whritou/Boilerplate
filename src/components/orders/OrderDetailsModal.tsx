@@ -40,7 +40,7 @@ export function OrderDetailsModal({ order, open, onOpenChange, onRefunded }: Pro
     if (!order) return null
 
     const hasAddress = !!(order.shippingFirstName || order.shippingStreet)
-    const canRefund = order.status !== "canceled" && order.paymentStatus === "succeeded" &&
+    const canRefund = order.status !== "canceled" && order.status !== "expired" && order.paymentStatus === "succeeded" &&
         order.status != "shipped" && order.status !== "delivered"
 
     const handleRefund = async () => {

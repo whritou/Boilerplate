@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Eye } from "lucide-react"
 import { useOrders } from "@/hooks/useOrder"
-import { statusVariant, paymentVariant, paymentLabels} from "@/utils/orderStatus"
+import { statusVariant, paymentVariant, paymentLabels, orderLabels} from "@/utils/orderStatus"
 
 export default function UserOrdersPage() {
     const [page, setPage] = useState(1)
@@ -49,7 +49,9 @@ export default function UserOrdersPage() {
             key: "status",
             header: "Statut",
             render: (row) => (
-                <Badge variant={statusVariant(row.status)}>{row.status}</Badge>
+                <Badge variant={statusVariant(row.status)}>
+                    {orderLabels[row.status] || row.status}
+                </Badge>
             ),
         },
         {
@@ -67,7 +69,7 @@ export default function UserOrdersPage() {
             className: "w-[80px] text-right",
             render: (row) => (
                 <Link href={`/checkout/${row.id}`}>
-                    <Button size="icon" variant="ghost" className="h-8 w-8">
+                    <Button size="icon" variant="ghost" aria-label={"Order Details"} className="h-8 w-8">
                         <Eye className="h-3.5 w-3.5" />
                     </Button>
                 </Link>

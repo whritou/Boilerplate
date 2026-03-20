@@ -9,11 +9,23 @@ import type { ShippingAddress } from '@/validations/order.schema'
 import type { QueryParams } from '@/lib/query/types'
 import type { OrderStatus, PaymentStatus } from '@prisma/client'
 
-const ORDER_EXPIRATION_MINUTES = 30
+const ORDER_EXPIRATION_MINUTES = 15
 
 class OrderService {
     async getAll(params: QueryParams) {
-        return orderRepository.findMany(params)
+        const result = await orderRepository.findMany(params)
+
+        // Auto-expire any orders in the result set so lists always reflect current state.
+        // Patch in-memory rather than re-fetching to avoid a second DB round-trip.
+        for (const order of result.data) {
+            if (this.isExpired(order as any)) {
+                await this.cancelExpired(order.id)
+                ;(order as any).status = 'expired'
+                ;(order as any).paymentStatus = 'canceled'
+            }
+        }
+
+        return result
     }
 
     async getById(id: string) {
@@ -34,7 +46,17 @@ class OrderService {
     }
 
     async getByUserId(userId: string) {
-        return orderRepository.findByUserId(userId)
+        const orders = await orderRepository.findByUserId(userId)
+
+        for (const order of orders) {
+            if (this.isExpired(order as any)) {
+                await this.cancelExpired(order.id)
+                ;(order as any).status = 'expired'
+                ;(order as any).paymentStatus = 'canceled'
+            }
+        }
+
+        return orders
     }
 
     /**
@@ -205,7 +227,7 @@ class OrderService {
             await productRepository.incrementStock(item.productId, item.quantity)
         }
 
-        await orderRepository.updateStatus(id, 'canceled')
+        await orderRepository.updateStatus(id, 'expired')
         await orderRepository.updatePaymentStatus(id, 'canceled')
     }
 
@@ -223,6 +245,10 @@ class OrderService {
 
         if (order.status === 'canceled') {
             throw new BadRequestError('Order is already cancelled')
+        }
+
+        if (order.status === 'expired') {
+            throw new BadRequestError('Order is expired')
         }
 
         if (order.paymentStatus === 'refunded') {

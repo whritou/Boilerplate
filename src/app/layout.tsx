@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/providers/ThemeProvider"
 import { cn } from "@/lib/utils";
 import AuthProvider from "@/providers/AuthProvider"
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import { Analytics } from "@vercel/analytics/next"
 
 const roboto = Roboto({subsets:['latin'],variable:'--font-sans'})
 
@@ -26,6 +27,7 @@ export default function RootLayout({
     >
       <body>
       <SpeedInsights/>
+      <Analytics/>
         <AuthProvider>
             <ThemeProvider>
                 {children}

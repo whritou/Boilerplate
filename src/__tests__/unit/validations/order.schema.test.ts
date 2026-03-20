@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { orderCreateSchema, orderStatusEnum, paymentStatusEnum, shippingAddressSchema } from '@/validations/order.schema'
 
 describe('orderStatusEnum', () => {
-    it.each(['pending', 'confirmed', 'shipped', 'delivered', 'canceled'])('accepts "%s"', (status) => {
+    it.each(['pending', 'confirmed', 'shipped', 'delivered', 'canceled', 'expired'])('accepts "%s"', (status) => {
         expect(orderStatusEnum.safeParse(status).success).toBe(true)
     })
 

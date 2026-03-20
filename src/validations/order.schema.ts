@@ -17,7 +17,8 @@ export const orderStatusEnum = z.enum([
     "confirmed",
     "shipped",
     "delivered",
-    "canceled"
+    "canceled",
+    "expired"
 ])
 
 export const orderBaseSchema = z.object({

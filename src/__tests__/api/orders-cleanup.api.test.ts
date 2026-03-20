@@ -58,7 +58,7 @@ describe('POST /api/orders/cleanup-expired', () => {
         expect(res.status).toBe(200)
         const json = await res.json()
         expect(json.success).toBe(true)
-        expect(json.canceledCount).toBe(3)
+        expect(json.expiredCount).toBe(3)
         expect(mockService.cancelAllExpired).toHaveBeenCalledOnce()
     })
 
@@ -100,6 +100,6 @@ describe('GET /api/orders/cleanup-expired', () => {
         expect(res.status).toBe(200)
         const json = await res.json()
         expect(json.success).toBe(true)
-        expect(json.canceledCount).toBe(5)
+        expect(json.expiredCount).toBe(5)
     })
 })

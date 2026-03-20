@@ -15,7 +15,15 @@ export function OrderRecap({ order }: Props) {
             <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                     <span>Recap</span>
-                    <Badge variant={order.status === "pending" ? "outline" : order.status === "canceled" ? "destructive" : "secondary"}>
+                    <Badge
+                        variant={
+                            order.status === "pending"
+                                ? "outline"
+                                : order.status === "canceled" || order.status === "expired"
+                                    ? "destructive"
+                                    : "default"
+                        }
+                    >
                         {order.status}
                     </Badge>
                 </CardTitle>

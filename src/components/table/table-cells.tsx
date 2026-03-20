@@ -16,14 +16,14 @@ export function CellStack({
 }) {
     return (
         <div className="flex flex-col gap-0.5">
-      <span
-          className={cn(
-              "text-[13px] font-medium text-stone-800 leading-snug",
-              primaryClassName
-          )}
-      >
-        {primary}
-      </span>
+              <span
+                  className={cn(
+                      "text-[13px] font-medium text-stone-800 leading-snug",
+                      primaryClassName
+                  )}
+              >
+                {primary}
+            </span>
 
             {secondary && (
                 <span className="text-[11px] text-muted-foreground leading-snug">
@@ -37,8 +37,8 @@ export function CellStack({
 export function CellAmount({ value }: { value: string }) {
     return (
         <span className="text-[13px] font-semibold text-destructive tabular-nums">
-      {value}
-    </span>
+            {value}
+        </span>
     )
 }
 
@@ -61,10 +61,9 @@ export function CellProgress({
 
     return (
         <div className="flex flex-col gap-1">
-      <span className="text-[12px] text-muted-foreground tabular-nums">
-        {sold}/{total}
-      </span>
-
+          <span className="text-[12px] text-muted-foreground tabular-nums">
+            {sold}/{total}
+          </span>
             <Progress value={pct} className="h-1 w-14" />
         </div>
     )
@@ -73,8 +72,8 @@ export function CellProgress({
 export function CellMuted({ children }: { children: ReactNode }) {
     return (
         <span className="text-[12px] text-muted-foreground">
-      {children}
-    </span>
+            {children}
+        </span>
     )
 }
 

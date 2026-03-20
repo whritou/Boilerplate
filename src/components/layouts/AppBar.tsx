@@ -49,9 +49,9 @@ export default function AppBar() {
                 <CartDrawer />
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Avatar className="cursor-pointer">
-                            <AvatarImage src={session.user?.image || ""} />
-                            <AvatarFallback>{session.user?.name?.[0] ?? "?"}</AvatarFallback>
+                        <Avatar className="cursor-pointer" aria-label={'Profile Picture'}>
+                            <AvatarImage src={session.user?.image || ""} alt="Profile Picture" />
+                            <AvatarFallback aria-label={"Profile icon"}>{session.user?.name?.[0] ?? "?"}</AvatarFallback>
                         </Avatar>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">

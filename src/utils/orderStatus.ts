@@ -5,6 +5,7 @@ export const statusVariant = (status: string) => {
         case "shipped": return "secondary"
         case "delivered": return "default"
         case "canceled": return "destructive"
+        case "expired": return "destructive"
         default: return "outline"
     }
 }
@@ -31,10 +32,20 @@ export const paymentLabels: Record<string, string> = {
     requires_payment_method: "Payment Required",
 }
 
+export const orderLabels: Record<string, string> = {
+    pending: "Pending",
+    confirmed: "Confirmed",
+    canceled: "Canceled",
+    shipped: "Shipped",
+    delivered: "Delivered",
+    expired: "Expired",
+}
+
 export const statusOptions = [
     { value: "pending", label: "Pending" },
     { value: "confirmed", label: "Confirmed" },
     { value: "shipped", label: "Shipped" },
     { value: "delivered", label: "Delivered" },
     { value: "canceled", label: "Canceled" },
+    { value: "expired", label: "Expired" },
 ]

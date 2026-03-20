@@ -15,8 +15,8 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-        const canceledCount = await orderService.cancelAllExpired()
-        return NextResponse.json({ success: true, canceledCount })
+        const expiredCount = await orderService.cancelAllExpired()
+        return NextResponse.json({ success: true, expiredCount })
     } catch (err) {
         console.error('[Cleanup Expired Orders] Error:', err)
         return NextResponse.json({ error: 'Cleanup failed' }, { status: 500 })

@@ -76,7 +76,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
     }, [order, session, prefilled])
 
     const countdown = useCountdown(order?.expiresAt)
-    const isExpired = order?.status === "canceled" || (countdown?.expired ?? false)
+    const isExpired = order?.status === "expired" || (countdown?.expired ?? false)
 
     const syncPayment = useCallback(async () => {
         setSyncing(true)

@@ -55,14 +55,12 @@ export function DataTable<T>({
     return (
         <div className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
 
-            {/* ✅ Toolbar ALWAYS visible */}
             {toolbar && (
                 <div className="border-b border-border">
                     {toolbar}
                 </div>
             )}
 
-            {/* ✅ EMPTY MODE */}
             {isEmpty ? (
                 <div className="flex items-center justify-center py-16">
                     {empty ?? <TableEmpty />}
@@ -78,7 +76,7 @@ export function DataTable<T>({
                                         <TableHead
                                             key={col.key}
                                             className={cn(
-                                                "px-4 py-2.5 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground",
+                                                "px-4 py-2.5 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-foreground",
                                                 col.headerClassName
                                             )}
                                         >
@@ -113,7 +111,6 @@ export function DataTable<T>({
                         </Table>
                     </div>
 
-                    {/* ✅ Footer ONLY when data exists */}
                     {footer && (
                         <div className="border-t border-border bg-muted/30 px-4 py-3">
                             {footer}
@@ -190,7 +187,7 @@ export function TablePagination({
 
             {/* LEFT — per page */}
             <div className="flex items-center justify-center md:justify-start gap-2">
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs">
                   Show
                 </span>
 
@@ -198,7 +195,7 @@ export function TablePagination({
                     value={String(perPage)}
                     onValueChange={(v) => onPerPageChange?.(Number(v))}
                 >
-                    <SelectTrigger className="h-8 w-[70px] text-xs">
+                    <SelectTrigger className="h-8 w-[70px] text-xs" aria-label={'Per Page'}>
                         <SelectValue />
                     </SelectTrigger>
 
@@ -210,13 +207,13 @@ export function TablePagination({
                     </SelectContent>
                 </Select>
 
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs">
                   per page
                 </span>
             </div>
 
             {/* CENTER — results info */}
-            <span className="text-xs text-muted-foreground text-center md:text-left">
+            <span className="text-xs text-center md:text-left">
                 {from}-{to} on {total}
             </span>
 
@@ -226,6 +223,7 @@ export function TablePagination({
                 <Button
                     size="icon"
                     variant="outline"
+                    aria-label={"Go to first page"}
                     className="h-8 w-8"
                     onClick={() => onChange(1)}
                     disabled={page === 1}
@@ -236,6 +234,7 @@ export function TablePagination({
                 <Button
                     size="icon"
                     variant="outline"
+                    aria-label={"Go to previous page"}
                     className="h-8 w-8"
                     onClick={() => onChange(page - 1)}
                     disabled={page === 1}
@@ -243,13 +242,14 @@ export function TablePagination({
                     <ChevronLeft className="h-4 w-4" />
                 </Button>
 
-                <span className="px-2 text-xs text-muted-foreground whitespace-nowrap">
+                <span className="px-2 text-xs whitespace-nowrap">
                   Page {page} / {totalPages}
                 </span>
 
                 <Button
                     size="icon"
                     variant="outline"
+                    aria-label={"Go to next page"}
                     className="h-8 w-8"
                     onClick={() => onChange(page + 1)}
                     disabled={page === totalPages}
@@ -260,6 +260,7 @@ export function TablePagination({
                 <Button
                     size="icon"
                     variant="outline"
+                    aria-label={"Go to last page"}
                     className="h-8 w-8"
                     onClick={() => onChange(totalPages)}
                     disabled={page === totalPages}

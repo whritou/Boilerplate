@@ -27,6 +27,10 @@ describe('statusVariant', () => {
         expect(statusVariant('canceled')).toBe('destructive')
     })
 
+    it('returns "destructive" for expired', () => {
+        expect(statusVariant('expired')).toBe('destructive')
+    })
+
     it('returns "outline" for unknown status', () => {
         expect(statusVariant('unknown-status')).toBe('outline')
     })
@@ -116,6 +120,7 @@ describe('statusOptions', () => {
         expect(values).toContain('shipped')
         expect(values).toContain('delivered')
         expect(values).toContain('canceled')
+        expect(values).toContain('expired')
     })
 
     it('each entry has value and label', () => {

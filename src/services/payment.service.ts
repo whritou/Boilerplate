@@ -124,7 +124,8 @@ class PaymentService {
         if (newStatus === 'succeeded') {
             await orderRepository.updateStatus(orderId, 'confirmed')
             await orderRepository.update(orderId, { expiresAt: null })
-        } else if (newStatus === 'canceled') {
+        } else if (newStatus === 'canceled' && order.status !== 'expired') {
+            // Don't overwrite 'expired' with 'canceled' — expiration is a distinct state
             await orderRepository.updateStatus(orderId, 'canceled')
         }
 
@@ -235,7 +236,11 @@ class PaymentService {
             await orderRepository.updateStatus(payment.orderId, 'confirmed')
             await orderRepository.update(payment.orderId, { expiresAt: null })
         } else if (status === 'canceled') {
-            await orderRepository.updateStatus(payment.orderId, 'canceled')
+            // Don't overwrite 'expired' with 'canceled' — expiration is a distinct state
+            const currentOrder = await orderRepository.findById(payment.orderId)
+            if (currentOrder?.status !== 'expired') {
+                await orderRepository.updateStatus(payment.orderId, 'canceled')
+            }
         }
 
         return payment

@@ -307,16 +307,84 @@ describe('OrderService.getAll', () => {
         expect(mockOrderRepo.findMany).toHaveBeenCalledWith({})
         expect(result).toBe(paginated)
     })
+
+    it('auto-expires expired orders in the result set and patches them in-memory', async () => {
+        const expiredOrder = {
+            id: 'ord-expired',
+            status: 'pending',
+            paymentStatus: 'requires_payment_method',
+            expiresAt: new Date(Date.now() - 60_000), // expired 1 minute ago
+            stripePaymentIntentId: null,
+            items: [{ productId: 'prod-1', quantity: 2 }],
+        }
+        const meta = { total: 1, page: 1, limit: 20, totalPages: 1, hasNextPage: false, hasPreviousPage: false }
+
+        mockOrderRepo.findMany.mockResolvedValue({ data: [expiredOrder], meta })
+        mockOrderRepo.findWithDetails.mockResolvedValue(expiredOrder)
+        mockProductRepo.incrementStock.mockResolvedValue({})
+        mockOrderRepo.updateStatus.mockResolvedValue({})
+        mockOrderRepo.updatePaymentStatus.mockResolvedValue({})
+
+        const result = await orderService.getAll({})
+
+        expect(mockOrderRepo.updateStatus).toHaveBeenCalledWith('ord-expired', 'expired')
+        expect(mockProductRepo.incrementStock).toHaveBeenCalledWith('prod-1', 2)
+        // No second findMany — statuses are patched directly on the in-memory object
+        expect(mockOrderRepo.findMany).toHaveBeenCalledTimes(1)
+        expect(result.data[0].status).toBe('expired')
+        expect(result.data[0].paymentStatus).toBe('canceled')
+    })
+
+    it('does not make extra DB calls when no orders are expired', async () => {
+        const activeOrder = {
+            id: 'ord-1',
+            status: 'confirmed',
+            paymentStatus: 'succeeded',
+            expiresAt: null,
+            items: [],
+        }
+        const paginated = { data: [activeOrder], meta: { total: 1, page: 1, limit: 20 } }
+        mockOrderRepo.findMany.mockResolvedValue(paginated)
+
+        const result = await orderService.getAll({})
+
+        expect(mockOrderRepo.findMany).toHaveBeenCalledTimes(1)
+        expect(result).toBe(paginated)
+    })
 })
 
 describe('OrderService.getByUserId', () => {
     it('delegates to orderRepository.findByUserId', async () => {
-        const orders = [{ id: 'ord-1' }]
+        const orders = [{ id: 'ord-1', status: 'confirmed', paymentStatus: 'succeeded', expiresAt: null }]
         mockOrderRepo.findByUserId.mockResolvedValue(orders)
 
         const result = await orderService.getByUserId('user-1')
         expect(mockOrderRepo.findByUserId).toHaveBeenCalledWith('user-1')
         expect(result).toBe(orders)
+    })
+
+    it('auto-expires expired orders and patches them in-memory', async () => {
+        const expiredOrder = {
+            id: 'ord-expired',
+            status: 'pending',
+            paymentStatus: 'requires_payment_method',
+            expiresAt: new Date(Date.now() - 60_000),
+            stripePaymentIntentId: null,
+            items: [],
+        }
+
+        mockOrderRepo.findByUserId.mockResolvedValue([expiredOrder])
+        mockOrderRepo.findWithDetails.mockResolvedValue(expiredOrder)
+        mockOrderRepo.updateStatus.mockResolvedValue({})
+        mockOrderRepo.updatePaymentStatus.mockResolvedValue({})
+
+        const result = await orderService.getByUserId('user-1')
+
+        expect(mockOrderRepo.updateStatus).toHaveBeenCalledWith('ord-expired', 'expired')
+        // No second findByUserId — statuses are patched directly on the in-memory object
+        expect(mockOrderRepo.findByUserId).toHaveBeenCalledTimes(1)
+        expect(result[0].status).toBe('expired')
+        expect(result[0].paymentStatus).toBe('canceled')
     })
 })
 
@@ -464,7 +532,7 @@ describe('OrderService.cancelExpired', () => {
 
         expect(mockProductRepo.incrementStock).toHaveBeenCalledWith('prod-1', 3)
         expect(mockProductRepo.incrementStock).toHaveBeenCalledWith('prod-2', 1)
-        expect(mockOrderRepo.updateStatus).toHaveBeenCalledWith('ord-1', 'canceled')
+        expect(mockOrderRepo.updateStatus).toHaveBeenCalledWith('ord-1', 'expired')
         expect(mockOrderRepo.updatePaymentStatus).toHaveBeenCalledWith('ord-1', 'canceled')
     })
 })
