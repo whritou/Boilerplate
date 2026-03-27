@@ -12,12 +12,6 @@ import type { OrderStatus, PaymentStatus } from '@prisma/client'
 const ORDER_EXPIRATION_MINUTES = 15
 
 class OrderService {
-    /**
-     * Fix #15: Removed inline expiration from read path.
-     * Expired orders are now handled exclusively by the CRON cleanup job.
-     * The `isExpired` helper is still used for single-order reads (getById)
-     * to mark them visually, but without triggering heavy cancel operations inline.
-     */
     async getAll(params: QueryParams) {
         return orderRepository.findMany(params)
     }
@@ -29,7 +23,6 @@ class OrderService {
             throw new NotFoundError('Order not found')
         }
 
-        // Mark single-order as expired on read (lightweight — no N+1 risk on single item)
         if (this.isExpired(order)) {
             await this.cancelExpired(id)
             const updated = await orderRepository.findWithDetails(id)
@@ -44,12 +37,6 @@ class OrderService {
         return orderRepository.findByUserId(userId)
     }
 
-    /**
-     * Creates an order from the user's cart.
-     * Fix #6:  Atomic stock decrement inside a Prisma transaction — prevents overselling.
-     * Fix #10: Re-validates product prices from the database at order time — prevents stale cart prices.
-     * Fix #16: Stock decrements run in parallel within the transaction.
-     */
     async createFromCart(userId: string, paymentStatus: PaymentStatus = 'requires_payment_method', stripePaymentIntentId?: string) {
         const cart = await cartRepository.findByUserId(userId)
 
@@ -57,7 +44,6 @@ class OrderService {
             throw new BadRequestError('Cart is empty')
         }
 
-        // Pre-validate all products and fetch current prices from DB
         const validatedItems: { productId: string; quantity: number; price: number; productName: string }[] = []
 
         for (const item of cart.items) {
@@ -75,7 +61,6 @@ class OrderService {
                 throw new BadRequestError(`Insufficient stock for "${product.name}"`)
             }
 
-            // Fix #10: Use current DB price, not the (possibly stale) cart price
             validatedItems.push({
                 productId: item.productId,
                 quantity: item.quantity,
@@ -91,8 +76,6 @@ class OrderService {
 
         const expiresAt = new Date(Date.now() + ORDER_EXPIRATION_MINUTES * 60 * 1000)
 
-        // Fix #6: Atomic transaction — create order + decrement stock together.
-        // If any decrement fails (e.g. concurrent request took last stock), everything rolls back.
         const order = await prisma.$transaction(async (tx) => {
             const created = await tx.order.create({
                 data: {
@@ -112,7 +95,6 @@ class OrderService {
                 include: { items: true },
             })
 
-            // Fix #16: Parallel stock decrements inside the transaction
             await Promise.all(
                 validatedItems.map((item) =>
                     tx.product.update({
@@ -176,10 +158,6 @@ class OrderService {
         return order
     }
 
-    /**
-     * User-initiated cancellation.
-     * Fix #16: Stock increments run in parallel.
-     */
     async cancel(id: string) {
         const order = await orderRepository.findWithDetails(id)
 
@@ -191,7 +169,6 @@ class OrderService {
             throw new BadRequestError('Cannot cancel a shipped or delivered order')
         }
 
-        // Fix #16: Parallel stock restoration
         await Promise.all(
             order.items.map((item) =>
                 productRepository.incrementStock(item.productId, item.quantity),
@@ -225,8 +202,6 @@ class OrderService {
 
     /**
      * Cancel an expired order: restore stock, cancel Stripe PaymentIntent, update statuses.
-     * Fix #19: Accepts optional pre-loaded order to avoid redundant DB fetch.
-     * Fix #16: Stock increments run in parallel.
      */
     async cancelExpired(id: string, preloadedOrder?: { stripePaymentIntentId: string | null; status: string; paymentStatus: string; items: { productId: string; quantity: number }[] }) {
         const order = preloadedOrder ?? await orderRepository.findWithDetails(id)
@@ -242,7 +217,6 @@ class OrderService {
             }
         }
 
-        // Fix #16: Parallel stock restoration
         await Promise.all(
             order.items.map((item) =>
                 productRepository.incrementStock(item.productId, item.quantity),
@@ -257,7 +231,6 @@ class OrderService {
      * Admin-initiated cancel + full refund.
      * Issues a Stripe refund, updates DB atomically, then sends email.
      * Email failure does NOT roll back the refund.
-     * Fix #16: Stock increments run in parallel.
      */
     async cancelAndRefund(id: string) {
         const order = await orderRepository.findWithDetails(id)
@@ -286,7 +259,6 @@ class OrderService {
             throw new BadRequestError('No payment intent found for this order')
         }
 
-        // Check for existing partial refunds on Stripe side
         const existingRefunds = await stripe.refunds.list({
             payment_intent: order.stripePaymentIntentId,
             limit: 1,
@@ -296,7 +268,6 @@ class OrderService {
             throw new BadRequestError('A partial refund already exists — manual review on stripe required')
         }
 
-        // Issue Stripe refund with idempotency key
         let refund
         try {
             refund = await stripe.refunds.create(
@@ -311,7 +282,6 @@ class OrderService {
             throw new BadRequestError('Refund failed — please try again or review on Stripe Dashboard')
         }
 
-        // Atomic DB update — order canceled + payment refunded + store refund ID + stock restored
         await prisma.$transaction(async (tx) => {
             await tx.order.update({
                 where: { id },
@@ -323,7 +293,6 @@ class OrderService {
                 data: { status: 'refunded', stripeRefundId: refund.id },
             })
 
-            // Fix #16: Parallel stock restoration inside transaction
             await Promise.all(
                 order.items.map((item) =>
                     tx.product.update({
@@ -334,7 +303,6 @@ class OrderService {
             )
         })
 
-        // Send email — failure is logged but does NOT roll back the refund
         try {
             const user = await prisma.user.findUnique({ where: { id: order.userId } })
             if (user?.email) {
@@ -353,7 +321,6 @@ class OrderService {
 
     /**
      * Batch cancel all expired unpaid orders. Used by the cleanup cron job.
-     * Fix #19: Passes the pre-loaded order to cancelExpired to avoid redundant DB fetch.
      */
     async cancelAllExpired() {
         const expiredOrders = await orderRepository.findExpiredUnpaid()

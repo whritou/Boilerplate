@@ -24,9 +24,6 @@ class PaymentService {
     /**
      * Creates a Stripe PaymentIntent for embedded payment on the checkout page.
      * Returns the client secret needed by Stripe Elements.
-     *
-     * Fix #17: Accepts an optional pre-loaded order to avoid a duplicate DB fetch
-     * when the route already fetched the order for authorization.
      */
     async createPaymentIntent(orderId: string, preloadedOrder?: { id: string; paymentStatus: string; shippingFirstName: string | null; shippingLastName: string | null; shippingStreet: string | null; shippingCity: string | null; shippingZipCode: string | null; shippingCountry: string | null; expiresAt: Date | null; status: string; stripePaymentIntentId: string | null; totalPrice: number | { toNumber(): number } }) {
         const order = preloadedOrder ?? await orderRepository.findWithDetails(orderId)
@@ -115,8 +112,6 @@ class PaymentService {
             return order
         }
 
-        // Check if webhook already processed this — avoid race condition
-        // Look up by stripePaymentIntentId first, then fall back to orderId
         let existingPayment = await paymentRepository.findByStripePaymentIntentId(order.stripePaymentIntentId)
         if (!existingPayment) {
             existingPayment = await paymentRepository.findOne({ orderId }) as any
@@ -132,7 +127,6 @@ class PaymentService {
             await orderRepository.updateStatus(orderId, 'confirmed')
             await orderRepository.update(orderId, { expiresAt: null })
         } else if (newStatus === 'canceled' && order.status !== 'expired') {
-            // Don't overwrite 'expired' with 'canceled' — expiration is a distinct state
             await orderRepository.updateStatus(orderId, 'canceled')
         }
 
@@ -199,7 +193,6 @@ class PaymentService {
             await orderRepository.updateStatus(payment.orderId, 'confirmed')
             await orderRepository.update(payment.orderId, { expiresAt: null })
         } else if (status === 'canceled') {
-            // Don't overwrite 'expired' with 'canceled' — expiration is a distinct state
             const currentOrder = await orderRepository.findById(payment.orderId)
             if (currentOrder?.status !== 'expired') {
                 await orderRepository.updateStatus(payment.orderId, 'canceled')
@@ -214,11 +207,8 @@ class PaymentService {
      * Handles a Stripe webhook event for a payment intent.
      * Verifies the paid amount matches the order total to prevent tampering.
      * Skips duplicate events (idempotent).
-     *
-     * Fix #18: Combined lookups — fetch payment and order in parallel when possible.
      */
     async handleStripeWebhook(stripePaymentIntentId: string, status: PaymentStatus, amountReceived?: number) {
-        // Fix #18: Fetch both payment and order by stripePaymentIntentId in parallel
         const [existing, order] = await Promise.all([
             paymentRepository.findByStripePaymentIntentId(stripePaymentIntentId),
             orderRepository.findByStripePaymentIntentId(stripePaymentIntentId),
@@ -235,7 +225,6 @@ class PaymentService {
             throw new NotFoundError('Order not found for payment intent')
         }
 
-        // Fix #2: Always verify amount on succeeded — never skip
         if (status === 'succeeded' && amountReceived !== undefined) {
             const expectedAmount = Math.round(Number(order.totalPrice) * 100)
             if (amountReceived !== expectedAmount) {
@@ -244,7 +233,6 @@ class PaymentService {
             }
         }
 
-        // Check if a payment already exists for this order (e.g. created by syncPaymentStatus)
         const existingForOrder = await paymentRepository.findOne({ orderId: order.id }) as any
         if (existingForOrder) {
             return this.updateStatus(existingForOrder.id, status)
@@ -260,8 +248,6 @@ class PaymentService {
 
     /**
      * Handles checkout.session.completed — records payment from the completed session.
-     * Fix #2: Always retrieves the full PaymentIntent to ensure amount_received is available
-     * for the amount verification check in handleStripeWebhook.
      */
     async handleCheckoutCompleted(sessionId: string) {
         const session = await stripe.checkout.sessions.retrieve(sessionId, {
@@ -276,7 +262,6 @@ class PaymentService {
         const paymentIntent = session.payment_intent as { id: string; status: string; amount_received?: number } | string
         const intentId = typeof paymentIntent === 'string' ? paymentIntent : paymentIntent.id
 
-        // Fix #2: If payment_intent was not expanded (string), retrieve it to get amount_received
         let amountReceived: number | undefined
         if (typeof paymentIntent === 'string') {
             const fullIntent = await stripe.paymentIntents.retrieve(paymentIntent)
