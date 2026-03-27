@@ -17,11 +17,11 @@ const searchFields = ['name', 'description', 'user.email']
 describe('Performance: QueryBuilder.getPaginationArgs', () => {
     it('runs 10,000 times in under 50ms', () => {
         const params = [
-            { page: '1', limit: '20' },
-            { page: '2', limit: '50' },
-            { page: '10', limit: '100' },
-            { page: '0', limit: '0' },       // boundary: clamps to page=1, limit=1
-            { page: '-5', limit: '200' },     // boundary: clamps
+            { page: 1, limit: 20 },
+            { page: 2, limit: 50 },
+            { page: 10, limit: 100 },
+            { page: 0, limit: 0 },       // boundary: clamps to page=1, limit=1
+            { page: -5, limit: 200 },     // boundary: clamps
         ]
 
         const start = performance.now()
@@ -41,8 +41,8 @@ describe('Performance: QueryBuilder.getPaginationArgs', () => {
 describe('Performance: QueryBuilder.buildWhereArgs', () => {
     it('runs 1,000 times with complex filters in under 100ms', () => {
         const params = {
-            page: '1',
-            limit: '20',
+            page: 1,
+            limit: 20,
             search: 'widget',
             filters: {
                 status: 'confirmed',
@@ -69,8 +69,8 @@ describe('Performance: QueryBuilder.buildWhereArgs', () => {
 
     it('handles null filter values in 1,000 iterations under 100ms', () => {
         const params = {
-            page: '1',
-            limit: '20',
+            page: 1,
+            limit: 20,
             filters: {
                 status: null,
                 userId: 'user-abc',
@@ -94,8 +94,8 @@ describe('Performance: QueryBuilder.buildWhereArgs', () => {
 describe('Performance: QueryBuilder.buildIncludeArgs', () => {
     it('runs 10,000 times with nested includes in under 100ms', () => {
         const params = {
-            page: '1',
-            limit: '20',
+            page: 1,
+            limit: 20,
             include: ['items', 'items.product', 'user', 'payment'],
         }
 
@@ -109,7 +109,7 @@ describe('Performance: QueryBuilder.buildIncludeArgs', () => {
     })
 
     it('runs 10,000 times with no includes in under 100ms', () => {
-        const params = { page: '1', limit: '20' }
+        const params = { page: 1, limit: 20 }
 
         const start = performance.now()
         for (let i = 0; i < 10_000; i++) {
@@ -157,8 +157,8 @@ describe('Performance: QueryBuilder.buildPaginatedResult', () => {
 describe('Performance: QueryBuilder.build (full pipeline)', () => {
     it('runs 1,000 full builds in under 100ms', () => {
         const params = {
-            page: '2',
-            limit: '25',
+            page: 2,
+            limit: 25,
             sortBy: 'price',
             sortOrder: 'asc' as const,
             search: 'laptop',
@@ -191,8 +191,8 @@ describe('Performance: QueryBuilder.build (full pipeline)', () => {
 
     it('produces correct output structure', () => {
         const params = {
-            page: '1',
-            limit: '10',
+            page: 1,
+            limit: 10,
             sortBy: 'name',
             sortOrder: 'desc' as const,
         }

@@ -1,56 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Ratelimit } from '@upstash/ratelimit'
+import { Redis } from '@upstash/redis'
 
-interface RateLimitEntry {
-    count: number
-    resetAt: number
-}
+const redis = new Redis({
+    url: process.env.UPSTASH_REDIS_REST_URL!,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+})
 
-const store = new Map<string, RateLimitEntry>()
+const limiters = new Map<string, Ratelimit>()
 
-const CLEANUP_INTERVAL = 60_000
-let lastCleanup = Date.now()
-
-function cleanup() {
-    const now = Date.now()
-    if (now - lastCleanup < CLEANUP_INTERVAL) return
-    lastCleanup = now
-    for (const [key, entry] of store) {
-        if (entry.resetAt <= now) store.delete(key)
+function getLimiter(windowMs: number, max: number): Ratelimit {
+    const key = `${windowMs}:${max}`
+    let limiter = limiters.get(key)
+    if (!limiter) {
+        limiter = new Ratelimit({
+            redis,
+            limiter: Ratelimit.slidingWindow(max, `${windowMs} ms`),
+            prefix: 'ratelimit',
+        })
+        limiters.set(key, limiter)
     }
+    return limiter
 }
 
 /**
- * Simple in-memory rate limiter for API routes.
- * For production with multiple instances, replace with Redis-based solution (e.g. @upstash/ratelimit).
+ * Redis-backed rate limiter for API routes using Upstash.
+ * Works across multiple serverless instances.
+ *
+ * Requires env vars: UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
  */
 export function rateLimit(options: { windowMs?: number; max?: number } = {}) {
     const { windowMs = 60_000, max = 10 } = options
+    const limiter = getLimiter(windowMs, max)
 
-    return function checkRateLimit(req: NextRequest): NextResponse | null {
-        cleanup()
-
+    return async function checkRateLimit(req: NextRequest): Promise<NextResponse | null> {
         const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
             ?? req.headers.get('x-real-ip')
             ?? 'unknown'
 
-        const key = `${ip}:${req.nextUrl.pathname}`
-        const now = Date.now()
-        const entry = store.get(key)
+        const identifier = `${ip}:${req.nextUrl.pathname}`
+        const { success, reset } = await limiter.limit(identifier)
 
-        if (!entry || entry.resetAt <= now) {
-            store.set(key, { count: 1, resetAt: now + windowMs })
-            return null
-        }
-
-        entry.count++
-
-        if (entry.count > max) {
+        if (!success) {
+            const retryAfter = Math.ceil((reset - Date.now()) / 1000)
             return NextResponse.json(
                 { success: false, error: 'Too many requests, please try again later' },
                 {
                     status: 429,
                     headers: {
-                        'Retry-After': String(Math.ceil((entry.resetAt - now) / 1000)),
+                        'Retry-After': String(Math.max(retryAfter, 1)),
                     },
                 },
             )

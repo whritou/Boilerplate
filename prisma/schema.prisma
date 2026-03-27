@@ -100,7 +100,7 @@ model Product {
   name        String  @unique
   description String? @db.Text
   imageUrl    String? @db.Text
-  price       Float   @db.DoublePrecision
+  price       Decimal @db.Decimal(10, 2)
 
   quantity Int @default(0)
 
@@ -131,7 +131,7 @@ model CartItem {
   cartId    String
   productId String
   quantity  Int
-  price     Float  @db.DoublePrecision
+  price     Decimal @db.Decimal(10, 2)
 
   cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
@@ -142,7 +142,7 @@ model CartItem {
 model Order {
   id                    String        @id @default(cuid())
   userId                String
-  totalPrice            Float         @db.DoublePrecision
+  totalPrice            Decimal       @db.Decimal(10, 2)
   status                OrderStatus   @default(pending)
   paymentStatus         PaymentStatus
   stripePaymentIntentId String?
@@ -163,6 +163,7 @@ model Order {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([stripePaymentIntentId])
   @@map("orders")
 }
 
@@ -171,7 +172,7 @@ model OrderItem {
   orderId   String
   productId String
   quantity  Int
-  price     Float  @db.DoublePrecision
+  price     Decimal @db.Decimal(10, 2)
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
@@ -184,12 +185,13 @@ model Payment {
   orderId               String        @unique
   stripePaymentIntentId String
   stripeRefundId        String?       @map("stripe_refund_id")
-  amount                Float         @db.DoublePrecision
+  amount                Decimal       @db.Decimal(10, 2)
   status                PaymentStatus
 
   order Order @relation(fields: [orderId], references: [id])
 
   createdAt DateTime @default(now())
 
+  @@index([stripePaymentIntentId])
   @@map("payments")
 }

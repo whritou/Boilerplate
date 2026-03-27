@@ -19,14 +19,14 @@ import { GET, PATCH, DELETE } from '@/app/api/products/[id]/route'
 import { NextRequest } from 'next/server'
 
 const mockRequireAdmin = requireAdmin as ReturnType<typeof vi.fn>
-const mockProductService = productService as Record<string, ReturnType<typeof vi.fn>>
+const mockProductService = productService as unknown as Record<string, ReturnType<typeof vi.fn>>
 
 beforeEach(() => {
     vi.clearAllMocks()
 })
 
 function makeRequest(url: string, options?: RequestInit) {
-    return new NextRequest(new URL(url, 'http://localhost:3000'), options)
+    return new NextRequest(new URL(url, 'http://localhost:3000'), options as any)
 }
 
 const fakeProduct = {

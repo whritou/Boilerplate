@@ -39,7 +39,7 @@ class CartService {
 
         const cart = await cartRepository.getOrCreate(userId)
 
-        await cartRepository.addItem(cart.id, productId, quantity, product.price)
+        await cartRepository.addItem(cart.id, productId, quantity, Number(product.price))
 
         return cartRepository.findWithItems(cart.id)
     }

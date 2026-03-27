@@ -7,7 +7,7 @@ vi.mock('@/services/order.service', () => ({
 }))
 
 import { orderService } from '@/services/order.service'
-import { POST, GET } from '@/app/api/orders/cleanup-expired/route'
+import { POST } from '@/app/api/orders/cleanup-expired/route'
 import { NextRequest } from 'next/server'
 
 const mockService = orderService as any
@@ -17,11 +17,11 @@ beforeEach(() => {
     process.env.CRON_SECRET = 'test-secret'
 })
 
-const makeRequest = (method: 'POST' | 'GET', authHeader?: string) => {
+const makeRequest = (authHeader?: string) => {
     const headers: Record<string, string> = {}
     if (authHeader !== undefined) headers['authorization'] = authHeader
     return new NextRequest(new URL('http://localhost:3000/api/orders/cleanup-expired'), {
-        method,
+        method: 'POST',
         headers,
     })
 }
@@ -32,7 +32,7 @@ const makeRequest = (method: 'POST' | 'GET', authHeader?: string) => {
 
 describe('POST /api/orders/cleanup-expired', () => {
     it('returns 401 when authorization header is missing', async () => {
-        const req = makeRequest('POST')
+        const req = makeRequest()
         const res = await POST(req)
 
         expect(res.status).toBe(401)
@@ -41,7 +41,7 @@ describe('POST /api/orders/cleanup-expired', () => {
     })
 
     it('returns 401 when authorization header has wrong secret', async () => {
-        const req = makeRequest('POST', 'Bearer wrong-secret')
+        const req = makeRequest('Bearer wrong-secret')
         const res = await POST(req)
 
         expect(res.status).toBe(401)
@@ -52,7 +52,7 @@ describe('POST /api/orders/cleanup-expired', () => {
     it('returns 200 with canceledCount on valid POST', async () => {
         mockService.cancelAllExpired.mockResolvedValue(3)
 
-        const req = makeRequest('POST', 'Bearer test-secret')
+        const req = makeRequest('Bearer test-secret')
         const res = await POST(req)
 
         expect(res.status).toBe(200)
@@ -65,41 +65,9 @@ describe('POST /api/orders/cleanup-expired', () => {
     it('returns 500 when orderService.cancelAllExpired throws', async () => {
         mockService.cancelAllExpired.mockRejectedValue(new Error('DB failure'))
 
-        const req = makeRequest('POST', 'Bearer test-secret')
+        const req = makeRequest('Bearer test-secret')
         const res = await POST(req)
 
         expect(res.status).toBe(500)
-    })
-})
-
-// ---------------------------------------------------------------------------
-// GET /api/orders/cleanup-expired (delegates to POST)
-// ---------------------------------------------------------------------------
-
-describe('GET /api/orders/cleanup-expired', () => {
-    it('returns 401 when authorization header is missing', async () => {
-        const req = makeRequest('GET')
-        const res = await GET(req)
-
-        expect(res.status).toBe(401)
-    })
-
-    it('returns 401 when authorization header has wrong secret', async () => {
-        const req = makeRequest('GET', 'Bearer bad-secret')
-        const res = await GET(req)
-
-        expect(res.status).toBe(401)
-    })
-
-    it('returns 200 with canceledCount on valid GET', async () => {
-        mockService.cancelAllExpired.mockResolvedValue(5)
-
-        const req = makeRequest('GET', 'Bearer test-secret')
-        const res = await GET(req)
-
-        expect(res.status).toBe(200)
-        const json = await res.json()
-        expect(json.success).toBe(true)
-        expect(json.expiredCount).toBe(5)
     })
 })

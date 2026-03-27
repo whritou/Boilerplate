@@ -22,14 +22,14 @@ import { PATCH as updateItemPATCH, DELETE as removeItemDELETE } from '@/app/api/
 import { NextRequest } from 'next/server'
 
 const mockRequireUser = requireUser as ReturnType<typeof vi.fn>
-const mockCartService = cartService as Record<string, ReturnType<typeof vi.fn>>
+const mockCartService = cartService as unknown as Record<string, ReturnType<typeof vi.fn>>
 
 beforeEach(() => {
     vi.clearAllMocks()
 })
 
 function makeRequest(url: string, options?: RequestInit) {
-    return new NextRequest(new URL(url, 'http://localhost:3000'), options)
+    return new NextRequest(new URL(url, 'http://localhost:3000'), options as any)
 }
 
 const fakeCart = {

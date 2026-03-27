@@ -6,10 +6,15 @@ import { ApiResponse } from '@/utils/apiResponse'
 import { withErrorHandler } from '@/middlewares/withErrorHandler'
 import { requireUser } from '@/lib/auth/requireAdmin'
 import { ForbiddenError } from '@/utils/errors'
+import { rateLimit } from '@/middlewares/rateLimit'
 
 const paramsSchema = z.object({ id: z.string().min(1) })
+const cancelLimit = rateLimit({ windowMs: 60_000, max: 10 })
 
-export const POST = withErrorHandler(async (_req: NextRequest, context) => {
+export const POST = withErrorHandler(async (req: NextRequest, context) => {
+    const limited = await cancelLimit(req)
+    if (limited) return limited
+
     const session = await requireUser()
     if (!session) throw new ForbiddenError()
 

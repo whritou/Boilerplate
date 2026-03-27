@@ -115,7 +115,7 @@ Order statuses: `pending → confirmed → shipped → delivered` (or `canceled`
 
 Two payment flows are supported side-by-side:
 
-### 1. Embedded Payment (Stripe Elements)
+### Embedded Payment (Stripe Elements)
 
 ```
 POST /api/payments/intent  →  createPaymentIntent(orderId)
@@ -126,13 +126,6 @@ POST /api/payments/intent  →  createPaymentIntent(orderId)
 - Creates a `PaymentIntent` via the Stripe API and stores the intent ID on the order
 - Reuses the existing intent if it is still active (avoids duplicates)
 - `syncPaymentStatus(orderId)` polls the intent status after the user returns — handles the case where webhooks have not fired yet
-
-### 2. Hosted Checkout (Stripe Checkout Sessions)
-
-```
-POST /api/payments/checkout  →  createCheckoutSession(orderId, successUrl, cancelUrl)
-                             →  redirects user to Stripe-hosted page
-```
 
 ### Webhooks
 
@@ -163,7 +156,7 @@ Three composable middleware wrappers used in API route handlers:
 
 - **`withValidation(schema)`** — parses the request body with a Zod schema and returns `400` on failure; passes validated data to the handler with full type inference
 - **`withErrorHandler(handler)`** — catches `NotFoundError`, `BadRequestError`, `ForbiddenError`, `UnauthorizedError`, and unexpected errors; maps them to the correct HTTP status via `ApiResponse`
-- **`rateLimit`** — in-memory sliding window rate limiter keyed by IP
+- **`rateLimit`** — use upstash rate limit and redis with a sliding window algorithm. Limiter instances are cached per config
 
 ---
 

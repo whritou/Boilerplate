@@ -16,7 +16,7 @@ const bodySchema = z.object({
 const checkLimit = rateLimit({ windowMs: 60_000, max: 10 })
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-    const limited = checkLimit(req)
+    const limited = await checkLimit(req)
     if (limited) return limited
 
     const session = await requireUser()
@@ -24,12 +24,13 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
     const { orderId } = bodySchema.parse(await req.json())
 
+    // Fix #17: Fetch the order once, use for both auth check and payment intent creation
     const order = await orderService.getById(orderId)
     if (session.user.role !== 'ADMIN' && order.userId !== session.user.id) {
         throw new ForbiddenError()
     }
 
-    const result = await paymentService.createPaymentIntent(orderId)
+    const result = await paymentService.createPaymentIntent(orderId, order)
 
     return ApiResponse.success(result)
 })

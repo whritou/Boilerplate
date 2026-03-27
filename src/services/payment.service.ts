@@ -1,6 +1,7 @@
 import { stripe } from '@/lib/stripe'
 import { paymentRepository } from '@/repositories/payment.repository'
 import { orderRepository } from '@/repositories/order.repository'
+import { prisma } from '@/lib/db/prisma'
 import { NotFoundError, BadRequestError } from '@/utils/errors'
 import type { QueryParams } from '@/lib/query/types'
 import type { PaymentStatus } from '@prisma/client'
@@ -23,9 +24,12 @@ class PaymentService {
     /**
      * Creates a Stripe PaymentIntent for embedded payment on the checkout page.
      * Returns the client secret needed by Stripe Elements.
+     *
+     * Fix #17: Accepts an optional pre-loaded order to avoid a duplicate DB fetch
+     * when the route already fetched the order for authorization.
      */
-    async createPaymentIntent(orderId: string) {
-        const order = await orderRepository.findWithDetails(orderId)
+    async createPaymentIntent(orderId: string, preloadedOrder?: { id: string; paymentStatus: string; shippingFirstName: string | null; shippingLastName: string | null; shippingStreet: string | null; shippingCity: string | null; shippingZipCode: string | null; shippingCountry: string | null; expiresAt: Date | null; status: string; stripePaymentIntentId: string | null; totalPrice: number | { toNumber(): number } }) {
+        const order = preloadedOrder ?? await orderRepository.findWithDetails(orderId)
 
         if (!order) {
             throw new NotFoundError('Order not found')
@@ -52,7 +56,10 @@ class PaymentService {
             }
         }
 
-        const amount = Math.round(order.totalPrice * 100)
+        const totalPrice = typeof order.totalPrice === 'object' && 'toNumber' in order.totalPrice
+            ? order.totalPrice.toNumber()
+            : Number(order.totalPrice)
+        const amount = Math.round(totalPrice * 100)
 
         const paymentIntent = await stripe.paymentIntents.create(
             {
@@ -135,57 +142,13 @@ class PaymentService {
             await paymentRepository.create({
                 order: { connect: { id: orderId } },
                 stripePaymentIntentId: order.stripePaymentIntentId,
-                amount: order.totalPrice,
+                amount: Number(order.totalPrice),
                 status: newStatus,
             })
         }
 
         return orderRepository.findWithDetails(orderId)
     }
-
-
-    /**
-     * Creates a Stripe Checkout Session for a given order.
-     */
-    async createCheckoutSession(orderId: string, successUrl: string, cancelUrl: string) {
-        const order = await orderRepository.findWithDetails(orderId)
-
-        if (!order) {
-            throw new NotFoundError('Order not found')
-        }
-
-        if (order.paymentStatus === 'succeeded') {
-            throw new BadRequestError('Order is already paid')
-        }
-
-        const session = await stripe.checkout.sessions.create({
-            mode: 'payment',
-            payment_method_types: ['card'],
-            line_items: order.items.map((item) => ({
-                price_data: {
-                    currency: 'eur',
-                    product_data: {
-                        name: item.product.name,
-                        ...(item.product.imageUrl ? { images: [item.product.imageUrl] } : {}),
-                    },
-                    unit_amount: Math.round(item.price * 100),
-                },
-                quantity: item.quantity,
-            })),
-            metadata: { orderId: order.id },
-            success_url: successUrl,
-            cancel_url: cancelUrl,
-        })
-
-        if (session.payment_intent) {
-            await orderRepository.update(order.id, {
-                stripePaymentIntentId: session.payment_intent as string,
-            })
-        }
-
-        return { sessionId: session.id, url: session.url }
-    }
-
 
     /**
      * Records a payment for an order.
@@ -251,9 +214,15 @@ class PaymentService {
      * Handles a Stripe webhook event for a payment intent.
      * Verifies the paid amount matches the order total to prevent tampering.
      * Skips duplicate events (idempotent).
+     *
+     * Fix #18: Combined lookups — fetch payment and order in parallel when possible.
      */
     async handleStripeWebhook(stripePaymentIntentId: string, status: PaymentStatus, amountReceived?: number) {
-        const existing = await paymentRepository.findByStripePaymentIntentId(stripePaymentIntentId)
+        // Fix #18: Fetch both payment and order by stripePaymentIntentId in parallel
+        const [existing, order] = await Promise.all([
+            paymentRepository.findByStripePaymentIntentId(stripePaymentIntentId),
+            orderRepository.findByStripePaymentIntentId(stripePaymentIntentId),
+        ])
 
         if (existing) {
             if (existing.status === status) {
@@ -262,14 +231,13 @@ class PaymentService {
             return this.updateStatus(existing.id, status)
         }
 
-        const order = await orderRepository.findByStripePaymentIntentId(stripePaymentIntentId)
-
         if (!order) {
             throw new NotFoundError('Order not found for payment intent')
         }
 
+        // Fix #2: Always verify amount on succeeded — never skip
         if (status === 'succeeded' && amountReceived !== undefined) {
-            const expectedAmount = Math.round(order.totalPrice * 100)
+            const expectedAmount = Math.round(Number(order.totalPrice) * 100)
             if (amountReceived !== expectedAmount) {
                 console.error(`[Payment] Amount mismatch for order ${order.id}: expected ${expectedAmount}, got ${amountReceived}`)
                 throw new BadRequestError('Payment amount does not match order total')
@@ -285,13 +253,15 @@ class PaymentService {
         return this.create({
             orderId: order.id,
             stripePaymentIntentId,
-            amount: order.totalPrice,
+            amount: Number(order.totalPrice),
             status,
         })
     }
 
     /**
      * Handles checkout.session.completed — records payment from the completed session.
+     * Fix #2: Always retrieves the full PaymentIntent to ensure amount_received is available
+     * for the amount verification check in handleStripeWebhook.
      */
     async handleCheckoutCompleted(sessionId: string) {
         const session = await stripe.checkout.sessions.retrieve(sessionId, {
@@ -305,7 +275,15 @@ class PaymentService {
 
         const paymentIntent = session.payment_intent as { id: string; status: string; amount_received?: number } | string
         const intentId = typeof paymentIntent === 'string' ? paymentIntent : paymentIntent.id
-        const amountReceived = typeof paymentIntent === 'string' ? undefined : paymentIntent.amount_received
+
+        // Fix #2: If payment_intent was not expanded (string), retrieve it to get amount_received
+        let amountReceived: number | undefined
+        if (typeof paymentIntent === 'string') {
+            const fullIntent = await stripe.paymentIntents.retrieve(paymentIntent)
+            amountReceived = fullIntent.amount_received
+        } else {
+            amountReceived = paymentIntent.amount_received
+        }
 
         await orderRepository.update(orderId, { stripePaymentIntentId: intentId })
 

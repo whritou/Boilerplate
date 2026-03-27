@@ -18,7 +18,7 @@ const checkLimit = rateLimit({ windowMs: 60_000, max: 5 })
  * Called after the user returns from Stripe payment confirmation.
  */
 export const POST = withErrorHandler(async (_req: NextRequest, context) => {
-    const limited = checkLimit(_req)
+    const limited = await checkLimit(_req)
     if (limited) return limited
 
     const session = await requireUser()

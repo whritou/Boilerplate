@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe'
 import { paymentService } from '@/services/payment.service'
 import { orderRepository } from '@/repositories/order.repository'
+import { orderService } from '@/services/order.service'
 import type { PaymentStatus } from '@prisma/client'
 
 export const runtime = 'nodejs'
@@ -79,9 +80,9 @@ export async function POST(req: NextRequest) {
                 if (piId) {
                     const order = await orderRepository.findByStripePaymentIntentId(piId)
                     if (order) {
-                        await orderRepository.updateStatus(order.id, 'canceled')
-                        await orderRepository.updatePaymentStatus(order.id, 'canceled')
-                        console.warn(`[Stripe Webhook] Dispute created for order ${order.id}, payment intent ${piId}`)
+                        // Cancel order and restore stock via the service (not just status update)
+                        await orderService.cancel(order.id)
+                        console.warn(`[Stripe Webhook] Dispute created for order ${order.id}, payment intent ${piId} — order canceled and stock restored`)
                     }
                 }
                 break

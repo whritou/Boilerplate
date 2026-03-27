@@ -31,17 +31,24 @@ interface Props {
     open: boolean
     onOpenChange: (open: boolean) => void
     onRefunded?: (order: OrderEntity) => void
+    onUpdate?: (order: OrderEntity) => void
 }
 
-export function OrderDetailsModal({ order, open, onOpenChange, onRefunded }: Props) {
+export function OrderDetailsModal({ order, open, onOpenChange, onRefunded, onUpdate }: Props) {
     const [refunding, setRefunding] = useState(false)
     const [refundError, setRefundError] = useState<string | null>(null)
+
+    const [updateOrderStatus, setUpdateOrderStatus] = useState<OrderEntity | null>(null)
+    const [updateOrderStatusError, setUpdateOrderStatusError] =useState<string | null>(null)
 
     if (!order) return null
 
     const hasAddress = !!(order.shippingFirstName || order.shippingStreet)
     const canRefund = order.status !== "canceled" && order.status !== "expired" && order.paymentStatus === "succeeded" &&
         order.status != "shipped" && order.status !== "delivered"
+
+    const canShip = order.status === "confirmed"
+    const canDeliver = order.status === "shipped"
 
     const handleRefund = async () => {
         setRefunding(true)
@@ -62,6 +69,38 @@ export function OrderDetailsModal({ order, open, onOpenChange, onRefunded }: Pro
             setRefundError("Network error")
         } finally {
             setRefunding(false)
+        }
+    }
+
+    const handleOrderStatusChange = async (status: "shipped" | "delivered") => {
+        if (!order) return
+
+        setUpdateOrderStatus(order)
+        setUpdateOrderStatusError(null)
+
+        try {
+            const res = await fetch(`/api/orders/${order.id}/status`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ status }),
+            })
+
+            const json = await res.json()
+
+            if (!res.ok) {
+                setUpdateOrderStatusError(json?.error || "Update failed")
+                return
+            }
+
+            const updated = mapOrder(json.data)
+            onUpdate?.(updated)
+            onOpenChange(false)
+        } catch {
+            setUpdateOrderStatusError("Network error")
+        } finally {
+            setUpdateOrderStatus(null)
         }
     }
 
@@ -154,6 +193,54 @@ export function OrderDetailsModal({ order, open, onOpenChange, onRefunded }: Pro
                             ))}
                         </div>
                     </div>
+
+                    {/* ORDER STATUS ACTIONS */}
+                    {(canShip || canDeliver) && (
+                        <>
+                            <Separator />
+                            <div className="space-y-2">
+                                {updateOrderStatusError && (
+                                    <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                                        {updateOrderStatusError}
+                                    </div>
+                                )}
+
+                                {order.status === "confirmed" && (
+                                    <Button
+                                        className="w-full"
+                                        disabled={!!updateOrderStatus}
+                                        onClick={() => handleOrderStatusChange("shipped")}
+                                    >
+                                        {updateOrderStatus ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                Marking as shipped...
+                                            </>
+                                        ) : (
+                                            "Mark as shipped"
+                                        )}
+                                    </Button>
+                                )}
+
+                                {order.status === "shipped" && (
+                                    <Button
+                                        className="w-full"
+                                        disabled={!!updateOrderStatus}
+                                        onClick={() => handleOrderStatusChange("delivered")}
+                                    >
+                                        {updateOrderStatus ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                Marking as delivered...
+                                            </>
+                                        ) : (
+                                            "Mark as delivered"
+                                        )}
+                                    </Button>
+                                )}
+                            </div>
+                        </>
+                    )}
 
                     {/* CANCEL & REFUND */}
                     {canRefund && (

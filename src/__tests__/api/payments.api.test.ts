@@ -8,7 +8,6 @@ vi.mock('@/lib/auth/requireAdmin', () => ({
 vi.mock('@/services/payment.service', () => ({
     paymentService: {
         createPaymentIntent: vi.fn(),
-        createCheckoutSession: vi.fn(),
         getById: vi.fn(),
     },
 }))
@@ -27,20 +26,19 @@ import { requireUser } from '@/lib/auth/requireAdmin'
 import { paymentService } from '@/services/payment.service'
 import { orderService } from '@/services/order.service'
 import { POST as createIntentPOST } from '@/app/api/payments/create-intent/route'
-import { POST as checkoutPOST } from '@/app/api/payments/checkout/route'
 import { GET as paymentGET } from '@/app/api/payments/[id]/route'
 import { NextRequest } from 'next/server'
 
 const mockRequireUser = requireUser as ReturnType<typeof vi.fn>
-const mockPaymentService = paymentService as Record<string, ReturnType<typeof vi.fn>>
-const mockOrderService = orderService as Record<string, ReturnType<typeof vi.fn>>
+const mockPaymentService = paymentService as unknown as Record<string, ReturnType<typeof vi.fn>>
+const mockOrderService = orderService as unknown as Record<string, ReturnType<typeof vi.fn>>
 
 beforeEach(() => {
     vi.clearAllMocks()
 })
 
 function makeRequest(url: string, options?: RequestInit) {
-    return new NextRequest(new URL(url, 'http://localhost:3000'), options)
+    return new NextRequest(new URL(url, 'http://localhost:3000'), options as any)
 }
 
 // ---------------------------------------------------------------------------
@@ -120,142 +118,6 @@ describe('POST /api/payments/create-intent', () => {
 
         expect(res.status).toBe(200)
         expect(json.data.clientSecret).toBe('pi_secret_admin')
-    })
-})
-
-// ---------------------------------------------------------------------------
-// POST /api/payments/checkout
-// ---------------------------------------------------------------------------
-
-describe('POST /api/payments/checkout', () => {
-    it('returns 403 when unauthenticated', async () => {
-        mockRequireUser.mockResolvedValue(null)
-
-        const req = makeRequest('http://localhost:3000/api/payments/checkout', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                orderId: 'order-1',
-                successUrl: 'https://example.com/success',
-                cancelUrl: 'https://example.com/cancel',
-            }),
-        })
-
-        const res = await checkoutPOST(req, { params: Promise.resolve({}) })
-        const json = await res.json()
-
-        expect(res.status).toBe(403)
-        expect(json.success).toBe(false)
-    })
-
-    it('returns 422 when successUrl is missing', async () => {
-        mockRequireUser.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } })
-
-        const req = makeRequest('http://localhost:3000/api/payments/checkout', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                orderId: 'order-1',
-                cancelUrl: 'https://example.com/cancel',
-            }),
-        })
-
-        const res = await checkoutPOST(req, { params: Promise.resolve({}) })
-        const json = await res.json()
-
-        expect(res.status).toBe(422)
-        expect(json.success).toBe(false)
-    })
-
-    it('returns 422 when cancelUrl is missing', async () => {
-        mockRequireUser.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } })
-
-        const req = makeRequest('http://localhost:3000/api/payments/checkout', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                orderId: 'order-1',
-                successUrl: 'https://example.com/success',
-            }),
-        })
-
-        const res = await checkoutPOST(req, { params: Promise.resolve({}) })
-        const json = await res.json()
-
-        expect(res.status).toBe(422)
-        expect(json.success).toBe(false)
-    })
-
-    it('returns 200 with checkout session on valid request', async () => {
-        mockRequireUser.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } })
-        mockOrderService.getById.mockResolvedValue({ id: 'order-1', userId: 'user-1' })
-        mockPaymentService.createCheckoutSession.mockResolvedValue({
-            url: 'https://checkout.stripe.com/session-url',
-            id: 'cs_test_123',
-        })
-
-        const req = makeRequest('http://localhost:3000/api/payments/checkout', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                orderId: 'order-1',
-                successUrl: 'https://example.com/success',
-                cancelUrl: 'https://example.com/cancel',
-            }),
-        })
-
-        const res = await checkoutPOST(req, { params: Promise.resolve({}) })
-        const json = await res.json()
-
-        expect(res.status).toBe(200)
-        expect(json.success).toBe(true)
-        expect(json.data.id).toBe('cs_test_123')
-    })
-
-    it('returns 403 when user tries to checkout another user\'s order', async () => {
-        mockRequireUser.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } })
-        mockOrderService.getById.mockResolvedValue({ id: 'order-1', userId: 'user-2' })
-
-        const req = makeRequest('http://localhost:3000/api/payments/checkout', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                orderId: 'order-1',
-                successUrl: 'https://example.com/success',
-                cancelUrl: 'https://example.com/cancel',
-            }),
-        })
-
-        const res = await checkoutPOST(req, { params: Promise.resolve({}) })
-        const json = await res.json()
-
-        expect(res.status).toBe(403)
-        expect(json.success).toBe(false)
-    })
-
-    it('admin can checkout for any order', async () => {
-        mockRequireUser.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } })
-        mockOrderService.getById.mockResolvedValue({ id: 'order-1', userId: 'user-2' })
-        mockPaymentService.createCheckoutSession.mockResolvedValue({
-            url: 'https://checkout.stripe.com/admin-session',
-            id: 'cs_admin_123',
-        })
-
-        const req = makeRequest('http://localhost:3000/api/payments/checkout', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                orderId: 'order-1',
-                successUrl: 'https://example.com/success',
-                cancelUrl: 'https://example.com/cancel',
-            }),
-        })
-
-        const res = await checkoutPOST(req, { params: Promise.resolve({}) })
-        const json = await res.json()
-
-        expect(res.status).toBe(200)
-        expect(json.success).toBe(true)
     })
 })
 

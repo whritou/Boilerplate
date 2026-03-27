@@ -167,6 +167,12 @@ export default function AdminOrdersPage() {
                 order={selectedOrder}
                 open={open}
                 onOpenChange={setOpen}
+                onUpdate={(updatedOrder) => {
+                    useOrderStore.setState((state) => ({
+                        entities: { ...state.entities, [updatedOrder.id]: updatedOrder },
+                    }))
+                    setSelectedOrder(updatedOrder)
+                }}
                 onRefunded={(updatedOrder) => {
                     useOrderStore.setState((state) => ({
                         entities: { ...state.entities, [updatedOrder.id]: updatedOrder },

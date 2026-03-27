@@ -29,15 +29,23 @@ vi.mock('@/repositories/order.repository', () => ({
     },
 }))
 
+vi.mock('@/services/order.service', () => ({
+    orderService: {
+        cancel: vi.fn(),
+    },
+}))
+
 import { stripe } from '@/lib/stripe'
 import { paymentService } from '@/services/payment.service'
 import { orderRepository } from '@/repositories/order.repository'
+import { orderService } from '@/services/order.service'
 import { POST } from '@/app/api/webhooks/stripe/route'
 import { NextRequest } from 'next/server'
 
-const mockStripe = stripe as { webhooks: { constructEvent: ReturnType<typeof vi.fn> } }
-const mockPaymentService = paymentService as Record<string, ReturnType<typeof vi.fn>>
-const mockOrderRepository = orderRepository as Record<string, ReturnType<typeof vi.fn>>
+const mockStripe = stripe as unknown as { webhooks: { constructEvent: ReturnType<typeof vi.fn> } }
+const mockPaymentService = paymentService as unknown as Record<string, ReturnType<typeof vi.fn>>
+const mockOrderRepository = orderRepository as unknown as Record<string, ReturnType<typeof vi.fn>>
+const mockOrderService = orderService as unknown as Record<string, ReturnType<typeof vi.fn>>
 
 beforeEach(() => {
     vi.clearAllMocks()
@@ -167,7 +175,7 @@ describe('POST /api/webhooks/stripe', () => {
         expect(mockPaymentService.handleStripeWebhook).toHaveBeenCalledWith('pi_789', 'canceled', 0)
     })
 
-    it('handles charge.dispute.created and cancels the associated order', async () => {
+    it('handles charge.dispute.created and cancels the associated order via orderService', async () => {
         mockStripe.webhooks.constructEvent.mockReturnValue({
             type: 'charge.dispute.created',
             data: {
@@ -178,8 +186,7 @@ describe('POST /api/webhooks/stripe', () => {
             },
         })
         mockOrderRepository.findByStripePaymentIntentId.mockResolvedValue({ id: 'order-1' })
-        mockOrderRepository.updateStatus.mockResolvedValue(undefined)
-        mockOrderRepository.updatePaymentStatus.mockResolvedValue(undefined)
+        mockOrderService.cancel.mockResolvedValue(undefined)
 
         const res = await POST(makeRequest('{}'))
         const json = await res.json()
@@ -187,8 +194,7 @@ describe('POST /api/webhooks/stripe', () => {
         expect(res.status).toBe(200)
         expect(json.received).toBe(true)
         expect(mockOrderRepository.findByStripePaymentIntentId).toHaveBeenCalledWith('pi_dispute')
-        expect(mockOrderRepository.updateStatus).toHaveBeenCalledWith('order-1', 'canceled')
-        expect(mockOrderRepository.updatePaymentStatus).toHaveBeenCalledWith('order-1', 'canceled')
+        expect(mockOrderService.cancel).toHaveBeenCalledWith('order-1')
     })
 
     it('handles charge.dispute.created gracefully when no order is found', async () => {
@@ -208,7 +214,7 @@ describe('POST /api/webhooks/stripe', () => {
 
         expect(res.status).toBe(200)
         expect(json.received).toBe(true)
-        expect(mockOrderRepository.updateStatus).not.toHaveBeenCalled()
+        expect(mockOrderService.cancel).not.toHaveBeenCalled()
     })
 
     it('returns 200 and does nothing for unknown event types', async () => {
