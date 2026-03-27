@@ -18,6 +18,7 @@ vi.mock('@/lib/db/prisma', () => ({
         $transaction: vi.fn(),
         order: { update: vi.fn() },
         payment: { update: vi.fn() },
+        product: { findMany: vi.fn(), update: vi.fn() },
         user: { findUnique: vi.fn() },
     },
 }))
@@ -105,19 +106,20 @@ beforeEach(() => {
 describe('OrderService.createFromCart', () => {
     it('creates order from cart and decrements stock', async () => {
         mockCartRepo.findByUserId.mockResolvedValue(sampleCart)
-        mockProductRepo.findById.mockResolvedValue(sampleProduct)
-        mockOrderRepo.createWithItems.mockResolvedValue({ id: 'ord-1', items: sampleCart.items })
-        mockProductRepo.decrementStock.mockResolvedValue({})
+        mockPrisma.product.findMany.mockResolvedValue([sampleProduct])
+        const createdOrder = { id: 'ord-1', items: sampleCart.items }
+        mockPrisma.$transaction.mockImplementation(async (fn: any) => {
+            const tx = {
+                order: { create: vi.fn().mockResolvedValue(createdOrder) },
+                product: { update: vi.fn().mockResolvedValue({}) },
+            }
+            return fn(tx)
+        })
         mockCartRepo.clearItems.mockResolvedValue({})
 
         const result = await orderService.createFromCart('user-1')
         expect(result.id).toBe('ord-1')
-        expect(mockProductRepo.decrementStock).toHaveBeenCalledWith('prod-1', 2)
         expect(mockCartRepo.clearItems).toHaveBeenCalledWith('cart-1')
-
-        expect(mockOrderRepo.createWithItems).toHaveBeenCalledWith(
-            expect.objectContaining({ expiresAt: expect.any(Date) }),
-        )
     })
 
     it('throws BadRequestError when cart is empty', async () => {
@@ -132,25 +134,25 @@ describe('OrderService.createFromCart', () => {
 
     it('throws BadRequestError when product has insufficient stock', async () => {
         mockCartRepo.findByUserId.mockResolvedValue(sampleCart)
-        mockProductRepo.findById.mockResolvedValue({ ...sampleProduct, quantity: 1 })
+        mockPrisma.product.findMany.mockResolvedValue([{ ...sampleProduct, quantity: 1 }])
         await expect(orderService.createFromCart('user-1')).rejects.toThrow(BadRequestError)
     })
 
     it('throws NotFoundError when product is not found', async () => {
         mockCartRepo.findByUserId.mockResolvedValue(sampleCart)
-        mockProductRepo.findById.mockResolvedValue(null)
+        mockPrisma.product.findMany.mockResolvedValue([])
         await expect(orderService.createFromCart('user-1')).rejects.toThrow(NotFoundError)
     })
 
     it('throws BadRequestError when product is archived', async () => {
         mockCartRepo.findByUserId.mockResolvedValue(sampleCart)
-        mockProductRepo.findById.mockResolvedValue({ ...sampleProduct, isArchived: true })
+        mockPrisma.product.findMany.mockResolvedValue([{ ...sampleProduct, isArchived: true }])
         await expect(orderService.createFromCart('user-1')).rejects.toThrow(BadRequestError)
     })
 
     it('throws BadRequestError when product is soft-deleted', async () => {
         mockCartRepo.findByUserId.mockResolvedValue(sampleCart)
-        mockProductRepo.findById.mockResolvedValue({ ...sampleProduct, deletedAt: new Date() })
+        mockPrisma.product.findMany.mockResolvedValue([{ ...sampleProduct, deletedAt: new Date() }])
         await expect(orderService.createFromCart('user-1')).rejects.toThrow(BadRequestError)
     })
 })
@@ -308,31 +310,25 @@ describe('OrderService.getAll', () => {
         expect(result).toBe(paginated)
     })
 
-    it('auto-expires expired orders in the result set and patches them in-memory', async () => {
+    it('returns results directly without auto-expiring (CRON handles expiration)', async () => {
         const expiredOrder = {
             id: 'ord-expired',
             status: 'pending',
             paymentStatus: 'requires_payment_method',
-            expiresAt: new Date(Date.now() - 60_000), // expired 1 minute ago
+            expiresAt: new Date(Date.now() - 60_000),
             stripePaymentIntentId: null,
             items: [{ productId: 'prod-1', quantity: 2 }],
         }
         const meta = { total: 1, page: 1, limit: 20, totalPages: 1, hasNextPage: false, hasPreviousPage: false }
 
         mockOrderRepo.findMany.mockResolvedValue({ data: [expiredOrder], meta })
-        mockOrderRepo.findWithDetails.mockResolvedValue(expiredOrder)
-        mockProductRepo.incrementStock.mockResolvedValue({})
-        mockOrderRepo.updateStatus.mockResolvedValue({})
-        mockOrderRepo.updatePaymentStatus.mockResolvedValue({})
 
         const result = await orderService.getAll({})
 
-        expect(mockOrderRepo.updateStatus).toHaveBeenCalledWith('ord-expired', 'expired')
-        expect(mockProductRepo.incrementStock).toHaveBeenCalledWith('prod-1', 2)
-        // No second findMany — statuses are patched directly on the in-memory object
+        // getAll no longer auto-expires — just delegates to findMany
         expect(mockOrderRepo.findMany).toHaveBeenCalledTimes(1)
-        expect(result.data[0].status).toBe('expired')
-        expect(result.data[0].paymentStatus).toBe('canceled')
+        expect(mockOrderRepo.updateStatus).not.toHaveBeenCalled()
+        expect(result.data[0].status).toBe('pending')
     })
 
     it('does not make extra DB calls when no orders are expired', async () => {
@@ -363,7 +359,7 @@ describe('OrderService.getByUserId', () => {
         expect(result).toBe(orders)
     })
 
-    it('auto-expires expired orders and patches them in-memory', async () => {
+    it('returns results directly without auto-expiring (CRON handles expiration)', async () => {
         const expiredOrder = {
             id: 'ord-expired',
             status: 'pending',
@@ -374,17 +370,13 @@ describe('OrderService.getByUserId', () => {
         }
 
         mockOrderRepo.findByUserId.mockResolvedValue([expiredOrder])
-        mockOrderRepo.findWithDetails.mockResolvedValue(expiredOrder)
-        mockOrderRepo.updateStatus.mockResolvedValue({})
-        mockOrderRepo.updatePaymentStatus.mockResolvedValue({})
 
         const result = await orderService.getByUserId('user-1')
 
-        expect(mockOrderRepo.updateStatus).toHaveBeenCalledWith('ord-expired', 'expired')
-        // No second findByUserId — statuses are patched directly on the in-memory object
+        // getByUserId no longer auto-expires — just delegates to findByUserId
         expect(mockOrderRepo.findByUserId).toHaveBeenCalledTimes(1)
-        expect(result[0].status).toBe('expired')
-        expect(result[0].paymentStatus).toBe('canceled')
+        expect(mockOrderRepo.updateStatus).not.toHaveBeenCalled()
+        expect(result[0].status).toBe('pending')
     })
 })
 
@@ -544,9 +536,7 @@ describe('OrderService.cancelAllExpired', () => {
             { id: 'ord-2', status: 'pending', paymentStatus: 'requires_payment_method', stripePaymentIntentId: null, items: [] },
         ]
         mockOrderRepo.findExpiredUnpaid.mockResolvedValue(expiredOrders)
-        mockOrderRepo.findWithDetails
-            .mockResolvedValueOnce(expiredOrders[0])
-            .mockResolvedValueOnce(expiredOrders[1])
+        // cancelAllExpired now passes preloaded order data, so no findWithDetails call needed
         mockProductRepo.incrementStock.mockResolvedValue({})
         mockOrderRepo.updateStatus.mockResolvedValue({})
         mockOrderRepo.updatePaymentStatus.mockResolvedValue({})
@@ -564,10 +554,7 @@ describe('OrderService.cancelAllExpired', () => {
             { id: 'ord-3', status: 'pending', paymentStatus: 'requires_payment_method', stripePaymentIntentId: null, items: [] },
         ]
         mockOrderRepo.findExpiredUnpaid.mockResolvedValue(expiredOrders)
-        mockOrderRepo.findWithDetails
-            .mockResolvedValueOnce(expiredOrders[0])
-            .mockResolvedValueOnce(expiredOrders[1])
-            .mockResolvedValueOnce(expiredOrders[2])
+        // cancelAllExpired now passes preloaded order data, so no findWithDetails call needed
         mockProductRepo.incrementStock.mockResolvedValue({})
         mockOrderRepo.updateStatus.mockResolvedValue({})
         mockOrderRepo.updatePaymentStatus.mockResolvedValue({})
@@ -594,10 +581,16 @@ describe('OrderService.cancelAndRefund', () => {
             .mockResolvedValueOnce(paidOrder)
             .mockResolvedValueOnce({ ...paidOrder, status: 'canceled', paymentStatus: 'refunded' })
         mockStripe.refunds.list.mockResolvedValue({ data: [] })
-        mockStripe.refunds.create.mockResolvedValue({ id: 're_123' })
-        mockPrisma.$transaction.mockResolvedValue([{}, {}])
-        mockProductRepo.incrementStock.mockResolvedValue({})
         mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-1', email: 'john@example.com' })
+        mockStripe.refunds.create.mockResolvedValue({ id: 're_123' })
+        mockPrisma.$transaction.mockImplementation(async (fn: any) => {
+            const tx = {
+                order: { update: vi.fn().mockResolvedValue({}) },
+                payment: { update: vi.fn().mockResolvedValue({}) },
+                product: { update: vi.fn().mockResolvedValue({}) },
+            }
+            return fn(tx)
+        })
         mockMail.sendOrderRefundEmail.mockResolvedValue(undefined)
 
         const result = await orderService.cancelAndRefund('ord-1')
@@ -608,7 +601,6 @@ describe('OrderService.cancelAndRefund', () => {
             { idempotencyKey: 'refund-ord-1' },
         )
         expect(mockPrisma.$transaction).toHaveBeenCalled()
-        expect(mockProductRepo.incrementStock).toHaveBeenCalledWith('prod-1', 2)
         expect(mockMail.sendOrderRefundEmail).toHaveBeenCalledWith('john@example.com', 'ord-1', '29.99')
     })
 
@@ -640,6 +632,7 @@ describe('OrderService.cancelAndRefund', () => {
     it('throws BadRequestError when partial refund exists on Stripe', async () => {
         mockOrderRepo.findWithDetails.mockResolvedValue(paidOrder)
         mockStripe.refunds.list.mockResolvedValue({ data: [{ id: 're_partial' }] })
+        mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-1', email: 'john@example.com' })
 
         await expect(orderService.cancelAndRefund('ord-1')).rejects.toThrow('partial refund already exists')
     })
@@ -647,6 +640,7 @@ describe('OrderService.cancelAndRefund', () => {
     it('throws BadRequestError when Stripe refund fails', async () => {
         mockOrderRepo.findWithDetails.mockResolvedValue(paidOrder)
         mockStripe.refunds.list.mockResolvedValue({ data: [] })
+        mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-1', email: 'john@example.com' })
         mockStripe.refunds.create.mockRejectedValue(new Error('charge_already_refunded'))
 
         await expect(orderService.cancelAndRefund('ord-1')).rejects.toThrow('Refund failed')
@@ -658,10 +652,16 @@ describe('OrderService.cancelAndRefund', () => {
             .mockResolvedValueOnce(paidOrder)
             .mockResolvedValueOnce({ ...paidOrder, status: 'canceled', paymentStatus: 'refunded' })
         mockStripe.refunds.list.mockResolvedValue({ data: [] })
-        mockStripe.refunds.create.mockResolvedValue({ id: 're_123' })
-        mockPrisma.$transaction.mockResolvedValue([{}, {}])
-        mockProductRepo.incrementStock.mockResolvedValue({})
         mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-1', email: 'john@example.com' })
+        mockStripe.refunds.create.mockResolvedValue({ id: 're_123' })
+        mockPrisma.$transaction.mockImplementation(async (fn: any) => {
+            const tx = {
+                order: { update: vi.fn().mockResolvedValue({}) },
+                payment: { update: vi.fn().mockResolvedValue({}) },
+                product: { update: vi.fn().mockResolvedValue({}) },
+            }
+            return fn(tx)
+        })
         mockMail.sendOrderRefundEmail.mockRejectedValue(new Error('SMTP down'))
 
         const result = await orderService.cancelAndRefund('ord-1')
@@ -673,10 +673,16 @@ describe('OrderService.cancelAndRefund', () => {
             .mockResolvedValueOnce(paidOrder)
             .mockResolvedValueOnce({ ...paidOrder, status: 'canceled', paymentStatus: 'refunded' })
         mockStripe.refunds.list.mockResolvedValue({ data: [] })
-        mockStripe.refunds.create.mockResolvedValue({ id: 're_123' })
-        mockPrisma.$transaction.mockResolvedValue([{}, {}])
-        mockProductRepo.incrementStock.mockResolvedValue({})
         mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-1', email: null })
+        mockStripe.refunds.create.mockResolvedValue({ id: 're_123' })
+        mockPrisma.$transaction.mockImplementation(async (fn: any) => {
+            const tx = {
+                order: { update: vi.fn().mockResolvedValue({}) },
+                payment: { update: vi.fn().mockResolvedValue({}) },
+                product: { update: vi.fn().mockResolvedValue({}) },
+            }
+            return fn(tx)
+        })
 
         const result = await orderService.cancelAndRefund('ord-1')
         expect(result!.status).toBe('canceled')

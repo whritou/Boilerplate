@@ -13,6 +13,10 @@ vi.mock('@/services/order.service', () => ({
     },
 }))
 
+vi.mock('@/middlewares/rateLimit', () => ({
+    rateLimit: () => () => Promise.resolve(null),
+}))
+
 import { requireUser } from '@/lib/auth/requireAdmin'
 import { orderService } from '@/services/order.service'
 import { GET, POST } from '@/app/api/orders/route'

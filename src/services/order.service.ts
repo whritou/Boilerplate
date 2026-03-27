@@ -44,10 +44,16 @@ class OrderService {
             throw new BadRequestError('Cart is empty')
         }
 
+        const productIds = cart.items.map((item: any) => item.productId)
+        const products = await prisma.product.findMany({
+            where: { id: { in: productIds } },
+        })
+        const productMap = new Map(products.map((p) => [p.id, p]))
+
         const validatedItems: { productId: string; quantity: number; price: number; productName: string }[] = []
 
         for (const item of cart.items) {
-            const product = await productRepository.findById(item.productId)
+            const product = productMap.get(item.productId)
 
             if (!product) {
                 throw new NotFoundError(`Product ${item.productId} not found`)
@@ -259,10 +265,13 @@ class OrderService {
             throw new BadRequestError('No payment intent found for this order')
         }
 
-        const existingRefunds = await stripe.refunds.list({
-            payment_intent: order.stripePaymentIntentId,
-            limit: 1,
-        })
+        const [existingRefunds, user] = await Promise.all([
+            stripe.refunds.list({
+                payment_intent: order.stripePaymentIntentId,
+                limit: 1,
+            }),
+            prisma.user.findUnique({ where: { id: order.userId } }),
+        ])
 
         if (existingRefunds.data.length > 0) {
             throw new BadRequestError('A partial refund already exists — manual review on stripe required')
@@ -304,7 +313,6 @@ class OrderService {
         })
 
         try {
-            const user = await prisma.user.findUnique({ where: { id: order.userId } })
             if (user?.email) {
                 await mailService.sendOrderRefundEmail(
                     user.email,

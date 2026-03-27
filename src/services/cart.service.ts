@@ -39,9 +39,7 @@ class CartService {
 
         const cart = await cartRepository.getOrCreate(userId)
 
-        await cartRepository.addItem(cart.id, productId, quantity, Number(product.price))
-
-        return cartRepository.findWithItems(cart.id)
+        return cartRepository.addItemAndReturn(cart.id, productId, quantity, Number(product.price))
     }
 
     async updateItemQuantity(userId: string, cartItemId: string, quantity: number) {

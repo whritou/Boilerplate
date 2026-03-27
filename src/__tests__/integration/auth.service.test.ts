@@ -47,7 +47,7 @@ const sampleUser = {
 beforeEach(() => {
     vi.clearAllMocks()
     process.env.NEXTAUTH_SECRET = 'test-secret'
-    Object.defineProperty(process.env, 'NODE_ENV', { value: 'test', writable: true })
+    // NODE_ENV is already 'test' when running via vitest
 })
 
 // ---------------------------------------------------------------------------

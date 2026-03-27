@@ -8,6 +8,7 @@ vi.mock('@/repositories/cart.repository', () => ({
         findWithItems: vi.fn(),
         getOrCreate: vi.fn(),
         addItem: vi.fn(),
+        addItemAndReturn: vi.fn(),
         updateItemQuantity: vi.fn(),
         removeItem: vi.fn(),
         clearItems: vi.fn(),
@@ -53,12 +54,11 @@ describe('CartService.addItem', () => {
     it('adds item when product exists and has stock', async () => {
         mockProductRepo.findById.mockResolvedValue(sampleProduct)
         mockCartRepo.getOrCreate.mockResolvedValue(sampleCart)
-        mockCartRepo.addItem.mockResolvedValue({})
-        mockCartRepo.findWithItems.mockResolvedValue({ ...sampleCart, items: [{ id: 'ci-1' }] })
+        mockCartRepo.addItemAndReturn.mockResolvedValue({ ...sampleCart, items: [{ id: 'ci-1' }] })
 
         const result = await cartService.addItem('user-1', 'prod-1', 2)
         expect(result?.items).toHaveLength(1)
-        expect(mockCartRepo.addItem).toHaveBeenCalledWith('cart-1', 'prod-1', 2, 10)
+        expect(mockCartRepo.addItemAndReturn).toHaveBeenCalledWith('cart-1', 'prod-1', 2, 10)
     })
 
     it('throws NotFoundError when product does not exist', async () => {

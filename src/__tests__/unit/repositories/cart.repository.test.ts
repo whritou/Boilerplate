@@ -71,11 +71,11 @@ describe('CartRepository.findWithItems', () => {
 
 describe('CartRepository.findByUserId', () => {
     it('finds cart by userId with items', async () => {
-        mockPrisma.cart.findFirst.mockResolvedValue(sampleCart)
+        mockPrisma.cart.findUnique.mockResolvedValue(sampleCart)
 
         const result = await cartRepository.findByUserId('user-1')
 
-        expect(mockPrisma.cart.findFirst).toHaveBeenCalledWith(
+        expect(mockPrisma.cart.findUnique).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: { userId: 'user-1' },
                 include: expect.objectContaining({ items: expect.anything() }),
@@ -85,7 +85,7 @@ describe('CartRepository.findByUserId', () => {
     })
 
     it('returns null when cart not found', async () => {
-        mockPrisma.cart.findFirst.mockResolvedValue(null)
+        mockPrisma.cart.findUnique.mockResolvedValue(null)
         const result = await cartRepository.findByUserId('user-none')
         expect(result).toBeNull()
     })
@@ -161,7 +161,7 @@ describe('CartRepository.clearItems', () => {
 
 describe('CartRepository.getOrCreate', () => {
     it('returns existing cart when found', async () => {
-        mockPrisma.cart.findFirst.mockResolvedValue(sampleCart)
+        mockPrisma.cart.findUnique.mockResolvedValue(sampleCart)
 
         const result = await cartRepository.getOrCreate('user-1')
 
@@ -171,7 +171,7 @@ describe('CartRepository.getOrCreate', () => {
 
     it('creates cart when not found', async () => {
         const newCart = { id: 'cart-new', userId: 'user-new', items: [] }
-        mockPrisma.cart.findFirst.mockResolvedValue(null)
+        mockPrisma.cart.findUnique.mockResolvedValue(null)
         mockPrisma.cart.create.mockResolvedValue(newCart)
 
         const result = await cartRepository.getOrCreate('user-new')

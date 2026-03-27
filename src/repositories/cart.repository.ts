@@ -21,7 +21,7 @@ class CartRepository extends BaseRepository<
     }
 
     async findByUserId(userId: string) {
-        return prisma.cart.findFirst({
+        return prisma.cart.findUnique({
             where: { userId },
             include: {
                 items: {
@@ -57,6 +57,25 @@ class CartRepository extends BaseRepository<
         return prisma.cartItem.create({
             data: { cartId, productId, quantity, price },
         })
+    }
+
+    async addItemAndReturn(cartId: string, productId: string, quantity: number, price: number) {
+        const existing = await prisma.cartItem.findFirst({
+            where: { cartId, productId },
+        })
+
+        if (existing) {
+            await prisma.cartItem.update({
+                where: { id: existing.id },
+                data: { quantity: existing.quantity + quantity },
+            })
+        } else {
+            await prisma.cartItem.create({
+                data: { cartId, productId, quantity, price },
+            })
+        }
+
+        return this.findWithItems(cartId)
     }
 
     async updateItemQuantity(cartItemId: string, quantity: number) {

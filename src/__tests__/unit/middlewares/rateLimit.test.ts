@@ -1,41 +1,27 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-// Mock Upstash Redis and Ratelimit so we don't need a real Redis connection
-const mockLimit = vi.fn()
-
-vi.mock('@upstash/redis', () => ({
-    Redis: vi.fn().mockImplementation(() => ({})),
+const { mockLimit } = vi.hoisted(() => ({
+    mockLimit: vi.fn(),
 }))
 
-vi.mock('@upstash/ratelimit', () => ({
-    Ratelimit: vi.fn().mockImplementation(() => ({
-        limit: mockLimit,
-    })),
-}))
-
-let rateLimit: typeof import('@/middlewares/rateLimit').rateLimit
-
-beforeEach(async () => {
-    vi.clearAllMocks()
-    vi.resetModules()
-
-    // Re-mock after resetModules
-    vi.doMock('@upstash/redis', () => ({
-        Redis: vi.fn().mockImplementation(() => ({})),
-    }))
-    vi.doMock('@upstash/ratelimit', () => ({
-        Ratelimit: vi.fn().mockImplementation(() => ({
-            limit: mockLimit,
-        })),
-    }))
-
-    const mod = await import('@/middlewares/rateLimit')
-    rateLimit = mod.rateLimit
+vi.mock('@upstash/redis', () => {
+    return { Redis: vi.fn().mockImplementation(function () { return {} }) }
 })
 
-afterEach(() => {
-    vi.useRealTimers()
+vi.mock('@upstash/ratelimit', () => {
+    const slidingWindow = vi.fn().mockReturnValue('sliding-window-config')
+    const Ratelimit = Object.assign(
+        vi.fn().mockImplementation(function () { return { limit: mockLimit } }),
+        { slidingWindow },
+    )
+    return { Ratelimit }
+})
+
+import { rateLimit } from '@/middlewares/rateLimit'
+
+beforeEach(() => {
+    vi.clearAllMocks()
 })
 
 function makeRequest(
@@ -98,7 +84,6 @@ describe('rateLimit', () => {
         await check(reqA)
         await check(reqB)
 
-        // Verify limit() was called with different identifiers
         const calls = mockLimit.mock.calls
         expect(calls[0][0]).toContain('1.1.1.1')
         expect(calls[1][0]).toContain('2.2.2.2')
@@ -150,7 +135,6 @@ describe('rateLimit', () => {
         await check(reqA)
         await check(reqB)
 
-        // Same IP but different paths → different identifiers
         expect(mockLimit.mock.calls[0][0]).toContain('/api/users')
         expect(mockLimit.mock.calls[1][0]).toContain('/api/products')
     })
