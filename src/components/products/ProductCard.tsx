@@ -11,7 +11,7 @@ export function ProductCard({ product }: { product: ProductEntity }) {
         <Link
             href={`/products/${product.id}`}
             className="group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-xl"
-            aria-label={`${product.name} - ${product.price.toFixed(2)} euros${outOfStock ? ", out of stock" : ""}`}
+            aria-label={`${product.name} - ${product.price} euros${outOfStock ? ", out of stock" : ""}`}
         >
             <article className="h-full rounded-xl border bg-card text-card-foreground overflow-hidden transition-all duration-200 group-hover:shadow-md group-hover:border-foreground/20">
                 <div className="relative aspect-square overflow-hidden bg-muted">
@@ -46,7 +46,7 @@ export function ProductCard({ product }: { product: ProductEntity }) {
                     )}
                     <div className="flex items-center justify-between pt-1">
                         <span className="text-lg font-bold tabular-nums">
-                            {product.price.toFixed(2)}&nbsp;&euro;
+                            {product.price}&nbsp;&euro;
                         </span>
                         {!outOfStock && product.quantity <= 5 && (
                             <Badge variant="outline">

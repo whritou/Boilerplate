@@ -88,7 +88,7 @@ export default function AdminProductsPage() {
             key: "price",
             header: "Price",
             className: "w-[100px]",
-            render: (row) => <CellAmount value={`${row.price.toFixed(2)} €`} />,
+            render: (row) => <CellAmount value={`${row.price} €`} />,
         },
         {
             key: "quantity",

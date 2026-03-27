@@ -10,7 +10,6 @@ import { Separator } from "@/components/ui/separator"
 import { ArrowLeft, ShoppingCart, Minus, Plus, Check, PackageOpen, AlertCircle } from "lucide-react"
 import { useCartStore } from "@/stores/cart.store"
 import { ProductDetailSkeleton } from "@/components/products/ProductDetailSkeleton"
-import { signIn } from "next-auth/react"
 
 export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params)
@@ -120,8 +119,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                                     {product.name}
                                 </h1>
 
-                                <p className="text-3xl font-bold tabular-nums" aria-label={`Price: ${product.price.toFixed(2)} euros`}>
-                                    {product.price.toFixed(2)}&nbsp;&euro;
+                                <p className="text-3xl font-bold tabular-nums" aria-label={`Price: ${product.price} euros`}>
+                                    {product.price}&nbsp;&euro;
                                 </p>
 
                                 <div>
